@@ -389,7 +389,7 @@ async function processTelegramUpdate(update) {
     await telegramApi("sendMessage", {
       chat_id: message.chat.id,
       text: "Чтобы подтвердить номер, нажмите «Отправить контакт».",
-      reply_markup: { keyboard: [[{ text: "Отправить контакт", request_contact: true }]], resize_keyboard: true, one_time_keyboard: true }
+      reply_markup: { keyboard: [[{ text: "Отправить контакт", request_contact: true }]], resize_keyboard: true, one_time_keyboard: false }
     });
   } else if (message?.contact) {
     if (message.contact.user_id !== message.from.id) {
