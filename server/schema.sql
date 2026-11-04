@@ -63,3 +63,8 @@ CREATE TABLE IF NOT EXISTS phone_registration_attempts (
 
 CREATE INDEX IF NOT EXISTS phone_registration_attempts_chat_idx ON phone_registration_attempts (telegram_chat_id);
 CREATE INDEX IF NOT EXISTS phone_registration_attempts_expires_idx ON phone_registration_attempts (expires_at);
+
+CREATE TABLE IF NOT EXISTS telegram_state (
+  key text PRIMARY KEY,
+  value text NOT NULL
+);

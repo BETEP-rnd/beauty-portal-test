@@ -418,12 +418,15 @@ async function telegramWebhook(req, res) {
 async function pollTelegram() {
   await telegramApi("deleteWebhook", { drop_pending_updates: false });
   let offset = 0;
+  const savedOffset = await pool.query("SELECT value FROM telegram_state WHERE key = 'updates_offset'");
+  if (savedOffset.rows[0]) offset = Number(savedOffset.rows[0].value);
   while (true) {
     try {
       const updates = await telegramApi("getUpdates", { offset, timeout: 50, allowed_updates: ["message"] }, 65000);
       for (const update of updates) {
         offset = update.update_id + 1;
         await processTelegramUpdate(update);
+        await pool.query("INSERT INTO telegram_state (key, value) VALUES ('updates_offset', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [String(offset)]);
       }
     } catch (error) {
       console.error(error.message);
