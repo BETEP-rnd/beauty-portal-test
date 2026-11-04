@@ -45,3 +45,21 @@ CREATE TABLE IF NOT EXISTS phone_login_attempts (
 
 CREATE INDEX IF NOT EXISTS phone_login_attempts_chat_idx ON phone_login_attempts (telegram_chat_id);
 CREATE INDEX IF NOT EXISTS phone_login_attempts_expires_idx ON phone_login_attempts (expires_at);
+
+ALTER TABLE masters ALTER COLUMN email DROP NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS masters_phone_unique ON masters (phone);
+
+CREATE TABLE IF NOT EXISTS phone_registration_attempts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  phone text NOT NULL,
+  telegram_chat_id bigint,
+  code_hash text,
+  verification_attempts integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL,
+  verified_at timestamptz,
+  used_at timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS phone_registration_attempts_chat_idx ON phone_registration_attempts (telegram_chat_id);
+CREATE INDEX IF NOT EXISTS phone_registration_attempts_expires_idx ON phone_registration_attempts (expires_at);

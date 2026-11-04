@@ -207,12 +207,13 @@ function otpHash(attemptId, code) {
   return crypto.createHmac("sha256", process.env.OTP_SECRET || "").update(`${attemptId}:${code}`).digest("hex");
 }
 
-async function sendPhoneCode(attempt) {
-  const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
-  await pool.query("UPDATE phone_login_attempts SET code_hash = $1, verification_attempts = 0 WHERE id = $2", [otpHash(attempt.id, code), attempt.id]);
+async function sendPhoneCode(attempt, purpose = "login") {
+  const code = String(crypto.randomInt(0, 10000)).padStart(4, "0");
+  const table = purpose === "register" ? "phone_registration_attempts" : "phone_login_attempts";
+  await pool.query(`UPDATE ${table} SET code_hash = $1, verification_attempts = 0 WHERE id = $2`, [otpHash(attempt.id, code), attempt.id]);
   await telegramApi("sendMessage", {
     chat_id: attempt.telegram_chat_id,
-    text: `Ваш код для входа в Мастерфолио: ${code}\n\nОн действует 10 минут. Никому не сообщайте его.`,
+    text: `Ваш код для ${purpose === "register" ? "регистрации" : "входа"} в Мастерфолио: ${code}\n\nОн действует 10 минут. Никому не сообщайте его.`,
     reply_markup: { remove_keyboard: true }
   });
 }
@@ -247,7 +248,7 @@ async function phoneVerify(req, res) {
   const data = await body(req);
   const attemptId = String(data.attemptId || "");
   const code = String(data.code || "").replace(/\s/g, "");
-  if (!/^[0-9a-f-]{36}$/i.test(attemptId) || !/^\d{6}$/.test(code)) throw new HttpError(400, "Введите шестизначный код из Telegram.");
+  if (!/^[0-9a-f-]{36}$/i.test(attemptId) || !/^\d{4}$/.test(code)) throw new HttpError(400, "Введите четырёхзначный код из Telegram.");
   const result = await pool.query(
     "SELECT a.id, a.telegram_chat_id, a.code_hash, a.verification_attempts, m.id AS master_id, m.name, m.email, m.phone FROM phone_login_attempts a JOIN masters m ON m.id = a.master_id WHERE a.id = $1 AND a.used_at IS NULL AND a.expires_at > now()",
     [attemptId]
@@ -272,6 +273,85 @@ async function phoneVerify(req, res) {
   json(res, 200, { master: { id: attempt.master_id, name: attempt.name, email: attempt.email, phone: attempt.phone } }, { "Set-Cookie": sessionCookie(token) });
 }
 
+async function registrationPhoneStart(req, res) {
+  requireTelegram();
+  const data = await body(req);
+  const phone = normalizePhone(data.phone);
+  const existing = await pool.query("SELECT 1 FROM masters WHERE phone = $1", [phone]);
+  if (existing.rows[0]) throw new HttpError(409, "Аккаунт с таким номером уже существует. Попробуйте войти.");
+  const result = await pool.query(
+    "INSERT INTO phone_registration_attempts (phone, expires_at) VALUES ($1, now() + interval '10 minutes') RETURNING id",
+    [phone]
+  );
+  json(res, 200, {
+    attemptId: result.rows[0].id,
+    botUrl: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME}?start=${result.rows[0].id}`
+  });
+}
+
+async function registrationPhoneVerify(req, res) {
+  requireTelegram();
+  const data = await body(req);
+  const attemptId = String(data.attemptId || "");
+  const code = String(data.code || "").replace(/\s/g, "");
+  if (!/^[0-9a-f-]{36}$/i.test(attemptId) || !/^\d{4}$/.test(code)) throw new HttpError(400, "Введите четырёхзначный код из Telegram.");
+  const result = await pool.query(
+    "SELECT id, code_hash, verification_attempts FROM phone_registration_attempts WHERE id = $1 AND used_at IS NULL AND verified_at IS NULL AND expires_at > now()",
+    [attemptId]
+  );
+  const attempt = result.rows[0];
+  if (!attempt || !attempt.code_hash) throw new HttpError(400, "Срок кода истёк. Запросите новый.");
+  if (attempt.verification_attempts >= 5) throw new HttpError(429, "Слишком много попыток. Запросите новый код.");
+  const actual = Buffer.from(otpHash(attemptId, code));
+  const expected = Buffer.from(attempt.code_hash);
+  if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) {
+    await pool.query("UPDATE phone_registration_attempts SET verification_attempts = verification_attempts + 1 WHERE id = $1", [attemptId]);
+    throw new HttpError(401, "Неверный код.");
+  }
+  await pool.query("UPDATE phone_registration_attempts SET verified_at = now() WHERE id = $1", [attemptId]);
+  json(res, 200, { registrationToken: attemptId, generatedPassword: crypto.randomBytes(12).toString("base64url") });
+}
+
+async function completePhoneRegistration(req, res) {
+  const data = await body(req);
+  const name = validateName(data.name);
+  const password = validatePassword(data.password);
+  const email = String(data.email || "").trim() ? normalizeEmail(data.email) : null;
+  const attemptId = String(data.registrationToken || "");
+  if (!/^[0-9a-f-]{36}$/i.test(attemptId)) throw new HttpError(400, "Сначала подтвердите номер через Telegram.");
+  if (data.consent !== true) throw new HttpError(400, "Для регистрации необходимо согласие на обработку данных.");
+  const passwordHash = await hashPassword(password);
+  const client = await pool.connect();
+  let master;
+  try {
+    await client.query("BEGIN");
+    const result = await client.query(
+      "SELECT id, phone, telegram_chat_id FROM phone_registration_attempts WHERE id = $1 AND verified_at IS NOT NULL AND used_at IS NULL AND expires_at > now() FOR UPDATE",
+      [attemptId]
+    );
+    const attempt = result.rows[0];
+    if (!attempt) throw new HttpError(400, "Подтверждение номера истекло. Начните регистрацию заново.");
+    const inserted = await client.query(
+      "INSERT INTO masters (name, email, phone, password_hash, consent_at, consent_version) VALUES ($1, $2, $3, $4, now(), '2026-11-04') RETURNING id, name, email, phone",
+      [name, email, attempt.phone, passwordHash]
+    );
+    master = inserted.rows[0];
+    await client.query("UPDATE phone_registration_attempts SET used_at = now() WHERE id = $1", [attemptId]);
+    if (attempt.telegram_chat_id) {
+      await client.query("INSERT INTO telegram_links (master_id, chat_id) VALUES ($1, $2)", [master.id, attempt.telegram_chat_id]);
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    if (error.code === "23505") throw new HttpError(409, "Аккаунт с таким номером или почтой уже существует.");
+    throw error;
+  } finally {
+    client.release();
+  }
+  const token = await createSession(master.id);
+  json(res, 201, { master }, { "Set-Cookie": sessionCookie(token) });
+}
+
 async function telegramWebhook(req, res) {
   if (req.headers["x-telegram-bot-api-secret-token"] !== process.env.TELEGRAM_WEBHOOK_SECRET || !process.env.TELEGRAM_WEBHOOK_SECRET) {
     throw new HttpError(401, "Неверный секрет webhook.");
@@ -281,15 +361,18 @@ async function telegramWebhook(req, res) {
   if (message?.text?.startsWith("/start")) {
     const match = message.text.match(/^\/start\s+([0-9a-f-]{36})$/i);
     if (match) {
-      const result = await pool.query(
-        "SELECT id FROM phone_login_attempts WHERE id = $1 AND used_at IS NULL AND expires_at > now()",
-        [match[1]]
-      );
+      let purpose = "login";
+      let result = await pool.query("SELECT id FROM phone_login_attempts WHERE id = $1 AND used_at IS NULL AND expires_at > now()", [match[1]]);
+      if (!result.rows[0]) {
+        purpose = "register";
+        result = await pool.query("SELECT id FROM phone_registration_attempts WHERE id = $1 AND used_at IS NULL AND verified_at IS NULL AND expires_at > now()", [match[1]]);
+      }
       if (result.rows[0]) {
-        await pool.query("UPDATE phone_login_attempts SET telegram_chat_id = $1 WHERE id = $2", [message.chat.id, match[1]]);
+        const table = purpose === "register" ? "phone_registration_attempts" : "phone_login_attempts";
+        await pool.query(`UPDATE ${table} SET telegram_chat_id = $1 WHERE id = $2`, [message.chat.id, match[1]]);
         await telegramApi("sendMessage", {
           chat_id: message.chat.id,
-          text: "Чтобы подтвердить номер для входа, нажмите «Отправить контакт».",
+          text: `Чтобы подтвердить номер для ${purpose === "register" ? "регистрации" : "входа"}, нажмите «Отправить контакт».`,
           reply_markup: { keyboard: [[{ text: "Отправить контакт", request_contact: true }]], resize_keyboard: true, one_time_keyboard: true }
         });
       }
@@ -300,14 +383,14 @@ async function telegramWebhook(req, res) {
     } else {
       const phone = normalizePhone(message.contact.phone_number);
       const result = await pool.query(
-        "SELECT a.id, a.telegram_chat_id, m.phone AS master_phone FROM phone_login_attempts a JOIN masters m ON m.id = a.master_id WHERE a.telegram_chat_id = $1 AND a.used_at IS NULL AND a.expires_at > now() ORDER BY a.created_at DESC LIMIT 1",
+        "SELECT id, phone, telegram_chat_id, 'login' AS purpose, created_at FROM phone_login_attempts WHERE telegram_chat_id = $1 AND used_at IS NULL AND expires_at > now() UNION ALL SELECT id, phone, telegram_chat_id, 'register' AS purpose, created_at FROM phone_registration_attempts WHERE telegram_chat_id = $1 AND used_at IS NULL AND verified_at IS NULL AND expires_at > now() ORDER BY created_at DESC LIMIT 1",
         [message.chat.id]
       );
       const attempt = result.rows[0];
-      if (attempt && attempt.master_phone === phone) {
-        await sendPhoneCode(attempt);
+      if (attempt && attempt.phone === phone) {
+        await sendPhoneCode(attempt, attempt.purpose);
       } else {
-        await telegramApi("sendMessage", { chat_id: message.chat.id, text: "Номер не совпадает с номером, указанным при входе. Вернитесь на сайт и попробуйте ещё раз.", reply_markup: { remove_keyboard: true } });
+        await telegramApi("sendMessage", { chat_id: message.chat.id, text: "Номер не совпадает с указанным на сайте. Вернитесь на страницу и попробуйте ещё раз.", reply_markup: { remove_keyboard: true } });
       }
     }
   }
@@ -328,6 +411,18 @@ async function handle(req, res) {
   if (url.pathname === "/api/auth/register" && req.method === "POST") {
     rateLimit(req, "register");
     return await register(req, res);
+  }
+  if (url.pathname === "/api/auth/register-phone/start" && req.method === "POST") {
+    rateLimit(req, "register-phone-start");
+    return await registrationPhoneStart(req, res);
+  }
+  if (url.pathname === "/api/auth/register-phone/verify" && req.method === "POST") {
+    rateLimit(req, "register-phone-verify");
+    return await registrationPhoneVerify(req, res);
+  }
+  if (url.pathname === "/api/auth/register/complete" && req.method === "POST") {
+    rateLimit(req, "register-complete");
+    return await completePhoneRegistration(req, res);
   }
   if (url.pathname === "/api/auth/login" && req.method === "POST") {
     rateLimit(req, "login");
