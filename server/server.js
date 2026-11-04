@@ -152,10 +152,11 @@ async function register(req, res) {
   const email = normalizeEmail(data.email);
   const phone = normalizePhone(data.phone);
   const password = validatePassword(data.password);
+  if (data.consent !== true) throw new HttpError(400, "Для регистрации необходимо согласие на обработку данных.");
   const passwordHash = await hashPassword(password);
   try {
     const result = await pool.query(
-      "INSERT INTO masters (name, email, phone, password_hash) VALUES ($1, $2, $3, $4) RETURNING id, name, email, phone",
+      "INSERT INTO masters (name, email, phone, password_hash, consent_at, consent_version) VALUES ($1, $2, $3, $4, now(), '2026-11-04') RETURNING id, name, email, phone",
       [name, email, phone, passwordHash]
     );
     const master = result.rows[0];
@@ -185,6 +186,134 @@ async function logout(req, res) {
   json(res, 200, { ok: true }, { "Set-Cookie": clearCookie() });
 }
 
+function requireTelegram() {
+  if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_BOT_USERNAME || !process.env.OTP_SECRET) {
+    throw new HttpError(503, "Telegram-бот ещё не подключён.");
+  }
+}
+
+async function telegramApi(method, payload) {
+  const response = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/${method}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error(`Telegram API: ${result.description || response.status}`);
+  return result.result;
+}
+
+function otpHash(attemptId, code) {
+  return crypto.createHmac("sha256", process.env.OTP_SECRET || "").update(`${attemptId}:${code}`).digest("hex");
+}
+
+async function sendPhoneCode(attempt) {
+  const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+  await pool.query("UPDATE phone_login_attempts SET code_hash = $1, verification_attempts = 0 WHERE id = $2", [otpHash(attempt.id, code), attempt.id]);
+  await telegramApi("sendMessage", {
+    chat_id: attempt.telegram_chat_id,
+    text: `Ваш код для входа в Мастерфолио: ${code}\n\nОн действует 10 минут. Никому не сообщайте его.`,
+    reply_markup: { remove_keyboard: true }
+  });
+}
+
+async function phoneStart(req, res) {
+  requireTelegram();
+  const data = await body(req);
+  const phone = normalizePhone(data.phone);
+  const masterResult = await pool.query("SELECT id, phone FROM masters WHERE phone = $1", [phone]);
+  const master = masterResult.rows[0];
+  if (!master) throw new HttpError(404, "Аккаунт с таким номером не найден.");
+  const linkResult = await pool.query("SELECT chat_id FROM telegram_links WHERE master_id = $1", [master.id]);
+  const chatId = linkResult.rows[0]?.chat_id || null;
+  const result = await pool.query(
+    "INSERT INTO phone_login_attempts (master_id, phone, telegram_chat_id, expires_at) VALUES ($1, $2, $3, now() + interval '10 minutes') RETURNING id",
+    [master.id, phone, chatId]
+  );
+  const attempt = { id: result.rows[0].id, telegram_chat_id: chatId };
+  if (chatId) {
+    await sendPhoneCode(attempt);
+    return json(res, 200, { attemptId: attempt.id, delivery: "telegram" });
+  }
+  json(res, 200, {
+    attemptId: attempt.id,
+    delivery: "bot",
+    botUrl: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME}?start=${attempt.id}`
+  });
+}
+
+async function phoneVerify(req, res) {
+  requireTelegram();
+  const data = await body(req);
+  const attemptId = String(data.attemptId || "");
+  const code = String(data.code || "").replace(/\s/g, "");
+  if (!/^[0-9a-f-]{36}$/i.test(attemptId) || !/^\d{6}$/.test(code)) throw new HttpError(400, "Введите шестизначный код из Telegram.");
+  const result = await pool.query(
+    "SELECT a.id, a.telegram_chat_id, a.code_hash, a.verification_attempts, m.id AS master_id, m.name, m.email, m.phone FROM phone_login_attempts a JOIN masters m ON m.id = a.master_id WHERE a.id = $1 AND a.used_at IS NULL AND a.expires_at > now()",
+    [attemptId]
+  );
+  const attempt = result.rows[0];
+  if (!attempt || !attempt.code_hash) throw new HttpError(400, "Срок кода истёк. Запросите новый.");
+  if (attempt.verification_attempts >= 5) throw new HttpError(429, "Слишком много попыток. Запросите новый код.");
+  const actual = Buffer.from(otpHash(attemptId, code));
+  const expected = Buffer.from(attempt.code_hash);
+  if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) {
+    await pool.query("UPDATE phone_login_attempts SET verification_attempts = verification_attempts + 1 WHERE id = $1", [attemptId]);
+    throw new HttpError(401, "Неверный код.");
+  }
+  await pool.query("UPDATE phone_login_attempts SET used_at = now() WHERE id = $1", [attemptId]);
+  if (attempt.telegram_chat_id) {
+    await pool.query(
+      "INSERT INTO telegram_links (master_id, chat_id) VALUES ($1, $2) ON CONFLICT (master_id) DO UPDATE SET chat_id = EXCLUDED.chat_id, updated_at = now()",
+      [attempt.master_id, attempt.telegram_chat_id]
+    );
+  }
+  const token = await createSession(attempt.master_id);
+  json(res, 200, { master: { id: attempt.master_id, name: attempt.name, email: attempt.email, phone: attempt.phone } }, { "Set-Cookie": sessionCookie(token) });
+}
+
+async function telegramWebhook(req, res) {
+  if (req.headers["x-telegram-bot-api-secret-token"] !== process.env.TELEGRAM_WEBHOOK_SECRET || !process.env.TELEGRAM_WEBHOOK_SECRET) {
+    throw new HttpError(401, "Неверный секрет webhook.");
+  }
+  const update = await body(req);
+  const message = update.message;
+  if (message?.text?.startsWith("/start")) {
+    const match = message.text.match(/^\/start\s+([0-9a-f-]{36})$/i);
+    if (match) {
+      const result = await pool.query(
+        "SELECT id FROM phone_login_attempts WHERE id = $1 AND used_at IS NULL AND expires_at > now()",
+        [match[1]]
+      );
+      if (result.rows[0]) {
+        await pool.query("UPDATE phone_login_attempts SET telegram_chat_id = $1 WHERE id = $2", [message.chat.id, match[1]]);
+        await telegramApi("sendMessage", {
+          chat_id: message.chat.id,
+          text: "Чтобы подтвердить номер для входа, нажмите «Отправить контакт».",
+          reply_markup: { keyboard: [[{ text: "Отправить контакт", request_contact: true }]], resize_keyboard: true, one_time_keyboard: true }
+        });
+      }
+    }
+  } else if (message?.contact) {
+    if (message.contact.user_id !== message.from.id) {
+      await telegramApi("sendMessage", { chat_id: message.chat.id, text: "Нужно отправить собственный контакт Telegram." });
+    } else {
+      const phone = normalizePhone(message.contact.phone_number);
+      const result = await pool.query(
+        "SELECT a.id, a.telegram_chat_id, m.phone AS master_phone FROM phone_login_attempts a JOIN masters m ON m.id = a.master_id WHERE a.telegram_chat_id = $1 AND a.used_at IS NULL AND a.expires_at > now() ORDER BY a.created_at DESC LIMIT 1",
+        [message.chat.id]
+      );
+      const attempt = result.rows[0];
+      if (attempt && attempt.master_phone === phone) {
+        await sendPhoneCode(attempt);
+      } else {
+        await telegramApi("sendMessage", { chat_id: message.chat.id, text: "Номер не совпадает с номером, указанным при входе. Вернитесь на сайт и попробуйте ещё раз.", reply_markup: { remove_keyboard: true } });
+      }
+    }
+  }
+  json(res, 200, { ok: true });
+}
+
 async function handle(req, res) {
   cors(req, res);
   if (req.method === "OPTIONS") {
@@ -204,6 +333,15 @@ async function handle(req, res) {
     rateLimit(req, "login");
     return await login(req, res);
   }
+  if (url.pathname === "/api/auth/phone/start" && req.method === "POST") {
+    rateLimit(req, "phone-start");
+    return await phoneStart(req, res);
+  }
+  if (url.pathname === "/api/auth/phone/verify" && req.method === "POST") {
+    rateLimit(req, "phone-verify");
+    return await phoneVerify(req, res);
+  }
+  if (url.pathname === "/api/telegram/webhook" && req.method === "POST") return await telegramWebhook(req, res);
   if (url.pathname === "/api/auth/logout" && req.method === "POST") return await logout(req, res);
   if (url.pathname === "/api/auth/me" && req.method === "GET") {
     const master = await currentMaster(req);

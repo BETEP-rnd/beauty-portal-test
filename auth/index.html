@@ -21,6 +21,10 @@
   .modes { display: grid; grid-template-columns: 1fr 1fr; margin: 0 -28px 26px; border-bottom: 1px solid var(--line); }
   .modes button { border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); font: inherit; font-size: 14px; padding: 19px 10px 15px; cursor: pointer; }
   .modes button[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .login-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); }
+  .login-methods button { border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 12px; padding: 9px 6px; cursor: pointer; }
+  .login-methods button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  .telegram-link { color: var(--accent); line-height: 1.5; }
   .auth-form { display: flex; flex-direction: column; gap: 17px; }
   .auth-form h2 { font-size: 12px; }
   .auth-form .btn { width: 100%; margin-top: 3px; padding: 13px 18px; }
@@ -67,9 +71,15 @@
 
       <form class="auth-form" id="login">
         <h2>Войти в личный кабинет</h2>
-        <div class="field"><label for="login-email">Электронная почта</label><input id="login-email" name="email" type="email" autocomplete="username" placeholder="name@example.ru" required></div>
-        <div class="field"><label for="login-password">Пароль</label><div class="password"><input id="login-password" name="password" type="password" autocomplete="current-password" required><button class="show" type="button" data-show="login-password">Показать</button></div></div>
-        <button class="btn" type="submit">Войти</button>
+        <div class="login-methods" role="group" aria-label="Способ входа"><button type="button" data-login-method="email" aria-pressed="true">По почте</button><button type="button" data-login-method="phone" aria-pressed="false">Войти по номеру</button></div>
+        <div class="field" id="login-email-wrap"><label for="login-email">Электронная почта</label><input id="login-email" name="email" type="email" autocomplete="username" placeholder="name@example.ru" required></div>
+        <div class="field" id="login-password-wrap"><label for="login-password">Пароль</label><div class="password"><input id="login-password" name="password" type="password" autocomplete="current-password" required><button class="show" type="button" data-show="login-password">Показать</button></div></div>
+        <div class="field" id="login-phone-wrap" hidden><label for="login-phone">Номер телефона</label><input id="login-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="18" placeholder="+7 (999) 999-99-99"></div>
+        <div class="hint" id="telegram-help" hidden>Откройте бота и нажмите «Отправить контакт». После этого код появится в Telegram.</div>
+        <a class="telegram-link" id="telegram-link" href="#" target="_blank" rel="noopener" hidden>Открыть Telegram-бота</a>
+        <div class="field" id="login-code-wrap" hidden><label for="login-code">Код из Telegram</label><input id="login-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="123456"></div>
+        <button class="btn" type="submit" id="login-submit">Войти</button>
+        <button class="linkbtn" type="button" id="phone-reset" hidden>Изменить номер</button>
         <div class="status" id="login-status" role="status"></div>
       </form>
 
@@ -80,8 +90,8 @@
         <div class="field"><label for="register-phone">Телефон</label><input id="register-phone" name="phone" type="tel" autocomplete="tel" placeholder="+7 (999) 999-99-99" required></div>
         <div class="field"><label for="register-password">Пароль</label><div class="password"><input id="register-password" name="password" type="password" autocomplete="new-password" minlength="8" required><button class="show" type="button" data-show="register-password">Показать</button></div><span class="hint">Не короче 8 символов.</span></div>
         <div class="field"><label for="register-repeat">Повторите пароль</label><div class="password"><input id="register-repeat" name="repeat" type="password" autocomplete="new-password" minlength="8" required><button class="show" type="button" data-show="register-repeat">Показать</button></div></div>
-        <label class="check"><input type="checkbox" required><span>Согласен(на) на обработку данных для создания и работы аккаунта.</span></label>
-        <button class="btn" type="submit">Создать аккаунт</button>
+        <label class="check"><input type="checkbox" id="register-agree" name="consent" required><span>Согласен(на) на обработку данных для создания и работы аккаунта.</span></label>
+        <button class="btn" type="submit" id="register-submit" disabled>Создать аккаунт</button>
         <div class="status" id="register-status" role="status"></div>
       </form>
     </section>
@@ -106,15 +116,59 @@ document.querySelectorAll("[data-show]").forEach(button => button.addEventListen
   input.type = input.type === "password" ? "text" : "password";
   button.textContent = input.type === "password" ? "Показать" : "Скрыть";
 }));
+function maskPhone(value) {
+  let digits = value.replace(/\D/g, "");
+  if (digits.startsWith("8")) digits = "7" + digits.slice(1);
+  if (digits && !digits.startsWith("7")) digits = "7" + digits;
+  const d = digits.slice(0, 11).slice(1);
+  if (!d) return "";
+  let result = "+7 (" + d.slice(0, 3);
+  if (d.length > 3) result += ") " + d.slice(3, 6);
+  if (d.length > 6) result += "-" + d.slice(6, 8);
+  if (d.length > 8) result += "-" + d.slice(8, 10);
+  return result;
+}
+document.querySelectorAll('input[type="tel"]').forEach(input => input.addEventListener("input", () => { input.value = maskPhone(input.value); }));
+const registerAgree = document.getElementById("register-agree");
+registerAgree.addEventListener("change", () => { document.getElementById("register-submit").disabled = !registerAgree.checked; });
 const API_URL = "https://api.masterfolio.ru";
+let loginMethod = "email", phoneAttemptId = "";
+function resetPhoneAttempt() {
+  phoneAttemptId = "";
+  const form = forms.login;
+  form.elements.phone.readOnly = false;
+  form.elements.code.value = "";
+  form.elements.code.required = false;
+  document.getElementById("login-code-wrap").hidden = true;
+  document.getElementById("telegram-help").hidden = true;
+  document.getElementById("telegram-link").hidden = true;
+  document.getElementById("phone-reset").hidden = true;
+  document.getElementById("login-submit").textContent = "Получить код в Telegram";
+}
+function setLoginMethod(method) {
+  loginMethod = method;
+  const email = method === "email";
+  document.querySelectorAll("[data-login-method]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.loginMethod === method)));
+  document.getElementById("login-email-wrap").hidden = !email;
+  document.getElementById("login-password-wrap").hidden = !email;
+  document.getElementById("login-phone-wrap").hidden = email;
+  forms.login.elements.email.required = email;
+  forms.login.elements.password.required = email;
+  forms.login.elements.phone.required = !email;
+  document.getElementById("login-status").textContent = "";
+  resetPhoneAttempt();
+  if (email) document.getElementById("login-submit").textContent = "Войти";
+}
+document.querySelectorAll("[data-login-method]").forEach(button => button.addEventListener("click", () => setLoginMethod(button.dataset.loginMethod)));
+document.getElementById("phone-reset").addEventListener("click", resetPhoneAttempt);
 Object.entries(forms).forEach(([mode, form]) => form.addEventListener("submit", async event => {
   event.preventDefault();
   if (!form.reportValidity()) return;
   const status = document.getElementById(mode + "-status");
-  if (mode === "register" && form.password.value !== form.repeat.value) {
+  if (mode === "register" && form.elements.password.value !== form.elements.repeat.value) {
     status.className = "status err";
     status.textContent = "Пароли не совпадают.";
-    form.repeat.focus();
+    form.elements.repeat.focus();
     return;
   }
   const submit = form.querySelector('button[type="submit"]');
@@ -122,10 +176,19 @@ Object.entries(forms).forEach(([mode, form]) => form.addEventListener("submit", 
   status.className = "status";
   status.textContent = "Подождите…";
   try {
-    const data = mode === "register"
-      ? { name: form.elements.name.value, email: form.elements.email.value, phone: form.elements.phone.value, password: form.elements.password.value }
-      : { email: form.elements.email.value, password: form.elements.password.value };
-    const response = await fetch(API_URL + "/api/auth/" + mode, {
+    let url = "/api/auth/" + mode, data;
+    if (mode === "register") {
+      data = { name: form.elements.name.value, email: form.elements.email.value, phone: form.elements.phone.value, password: form.elements.password.value, consent: form.elements.consent.checked };
+    } else if (loginMethod === "email") {
+      data = { email: form.elements.email.value, password: form.elements.password.value };
+    } else if (!phoneAttemptId) {
+      url = "/api/auth/phone/start";
+      data = { phone: form.elements.phone.value };
+    } else {
+      url = "/api/auth/phone/verify";
+      data = { attemptId: phoneAttemptId, code: form.elements.code.value };
+    }
+    const response = await fetch(API_URL + url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -133,14 +196,33 @@ Object.entries(forms).forEach(([mode, form]) => form.addEventListener("submit", 
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || "Не удалось выполнить запрос.");
-    form.querySelectorAll('input[type="password"]').forEach(input => { input.value = ""; });
+    if (mode === "login" && loginMethod === "phone" && result.attemptId) {
+      phoneAttemptId = result.attemptId;
+      form.elements.phone.readOnly = true;
+      form.elements.code.required = true;
+      document.getElementById("login-code-wrap").hidden = false;
+      document.getElementById("phone-reset").hidden = false;
+      document.getElementById("login-submit").textContent = "Войти";
+      if (result.delivery === "bot") {
+        document.getElementById("telegram-help").hidden = false;
+        const link = document.getElementById("telegram-link");
+        link.href = result.botUrl;
+        link.hidden = false;
+        status.textContent = "Теперь откройте Telegram-бота и подтвердите контакт.";
+      } else {
+        status.textContent = "Код отправлен в Telegram. Введите его ниже.";
+      }
+    } else {
+      form.querySelectorAll('input[type="password"]').forEach(input => { input.value = ""; });
+      if (mode === "login" && loginMethod === "phone") form.elements.code.value = "";
+      status.textContent = mode === "register" ? "Аккаунт создан, вход выполнен." : "Вход выполнен.";
+    }
     status.className = "status ok";
-    status.textContent = mode === "register" ? "Аккаунт создан, вход выполнен." : "Вход выполнен.";
   } catch (error) {
     status.className = "status err";
     status.textContent = error instanceof TypeError ? "Не удалось связаться с сервером. Попробуйте позже." : error.message;
   } finally {
-    submit.disabled = false;
+    submit.disabled = mode === "register" && !form.elements.consent.checked;
   }
 }));
 setMode(new URLSearchParams(location.search).get("mode") === "register" ? "register" : "login");

@@ -9,6 +9,9 @@ CREATE TABLE IF NOT EXISTS masters (
 
 CREATE UNIQUE INDEX IF NOT EXISTS masters_email_unique ON masters (lower(email));
 
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS consent_at timestamptz;
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS consent_version text;
+
 CREATE TABLE IF NOT EXISTS sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   token_hash char(64) NOT NULL UNIQUE,
@@ -19,3 +22,26 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE INDEX IF NOT EXISTS sessions_master_id_idx ON sessions (master_id);
 CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions (expires_at);
+
+CREATE TABLE IF NOT EXISTS telegram_links (
+  master_id uuid PRIMARY KEY REFERENCES masters(id) ON DELETE CASCADE,
+  chat_id bigint NOT NULL UNIQUE,
+  telegram_username text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS phone_login_attempts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  master_id uuid NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+  phone text NOT NULL,
+  telegram_chat_id bigint,
+  code_hash text,
+  verification_attempts integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL,
+  used_at timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS phone_login_attempts_chat_idx ON phone_login_attempts (telegram_chat_id);
+CREATE INDEX IF NOT EXISTS phone_login_attempts_expires_idx ON phone_login_attempts (expires_at);
