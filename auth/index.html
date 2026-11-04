@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f7f3ee">
+<title>Вход — Мастерфолио</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Montserrat:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../kit/kit.css?v=202610270023">
+<script>try { var u = localStorage.getItem("beauty.ui"); if (u) document.documentElement.dataset.ui = u; } catch (e) {}</script>
+<style>
+  body { min-height: 100vh; }
+  .auth-wrap { max-width: 1080px; margin: 0 auto; }
+  .brand { display: inline-block; color: inherit; text-decoration: none; font-family: var(--display); font-size: 32px; font-weight: 600; line-height: 1; }
+  .auth { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 440px); gap: 80px; align-items: center; min-height: calc(100vh - 130px); padding: 50px 0; }
+  .intro .eyebrow { margin: 0 0 18px; color: var(--accent); font-size: 11px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; }
+  .intro h1 { max-width: 530px; margin: 0; font-family: var(--display); font-size: clamp(45px, 5vw, 64px); font-weight: 500; line-height: 1.05; }
+  .intro h1 em { display: block; color: var(--accent); font-weight: 500; }
+  .intro p { max-width: 480px; margin: 24px 0 0; color: var(--page-muted, var(--muted)); font-size: 16px; line-height: 1.7; }
+  .account { padding: 0 28px 28px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); color: var(--text); box-shadow: 0 20px 55px rgba(40, 25, 15, .08); }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; margin: 0 -28px 26px; border-bottom: 1px solid var(--line); }
+  .modes button { border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); font: inherit; font-size: 14px; padding: 19px 10px 15px; cursor: pointer; }
+  .modes button[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .auth-form { display: flex; flex-direction: column; gap: 17px; }
+  .auth-form h2 { font-size: 12px; }
+  .auth-form .btn { width: 100%; margin-top: 3px; padding: 13px 18px; }
+  .auth-form label { font-size: 13px; }
+  .auth-form input { padding: 12px; }
+  .password { position: relative; }
+  .password input { padding-right: 70px; }
+  .show { position: absolute; right: 7px; top: 50%; transform: translateY(-50%); border: 0; background: none; color: var(--accent); font: inherit; font-size: 12px; padding: 8px; cursor: pointer; }
+  .check { align-items: flex-start; font-size: 12px; line-height: 1.5; }
+  .check input { margin-top: 2px; }
+  .status { min-height: 0; }
+  .status:empty { display: none; }
+  .demo { margin-bottom: 22px; padding: 11px 13px; border: 1px dashed var(--accent); border-radius: 10px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+  @media (max-width: 800px) {
+    .auth { grid-template-columns: minmax(0, 1fr); gap: 36px; min-height: 0; }
+    .intro h1, .intro p { max-width: 600px; }
+  }
+  @media (max-width: 480px) {
+    .brand { font-size: 28px; }
+    .auth { padding: 38px 0 20px; }
+    .intro h1 { font-size: 43px; }
+    .intro p { font-size: 14px; }
+    .account { padding: 0 18px 20px; }
+    .modes { margin: 0 -18px 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="auth-wrap">
+  <a class="brand" href="../">Мастерфолио</a>
+  <main class="auth">
+    <section class="intro">
+      <p class="eyebrow">Личное пространство мастера</p>
+      <h1>Ваша работа.<em>Только ваши данные.</em></h1>
+      <p>Один аккаунт для прайсов, свободных окошек, сертификатов и клиентской базы. Всё будет храниться отдельно для каждого мастера.</p>
+    </section>
+    <section class="account" aria-label="Аккаунт мастера">
+      <div class="modes" role="tablist" aria-label="Вход или регистрация">
+        <button type="button" role="tab" id="login-tab" data-mode="login" aria-controls="login">Вход</button>
+        <button type="button" role="tab" id="register-tab" data-mode="register" aria-controls="register">Регистрация</button>
+      </div>
+      <div class="demo">Макет для тестового сайта: аккаунты пока не создаются, введённые данные никуда не отправляются.</div>
+
+      <form class="auth-form" id="login">
+        <h2>Войти в личный кабинет</h2>
+        <div class="field"><label for="login-email">Электронная почта</label><input id="login-email" name="email" type="email" autocomplete="username" placeholder="name@example.ru" required></div>
+        <div class="field"><label for="login-password">Пароль</label><div class="password"><input id="login-password" name="password" type="password" autocomplete="current-password" required><button class="show" type="button" data-show="login-password">Показать</button></div></div>
+        <button class="btn" type="submit">Войти</button>
+        <div class="status" id="login-status" role="status"></div>
+      </form>
+
+      <form class="auth-form" id="register" hidden>
+        <h2>Создать аккаунт мастера</h2>
+        <div class="field"><label for="register-name">Имя мастера</label><input id="register-name" name="name" type="text" autocomplete="name" maxlength="60" placeholder="Как к вам обращаться" required></div>
+        <div class="field"><label for="register-email">Электронная почта</label><input id="register-email" name="email" type="email" autocomplete="username" placeholder="name@example.ru" required></div>
+        <div class="field"><label for="register-phone">Телефон</label><input id="register-phone" name="phone" type="tel" autocomplete="tel" placeholder="+7 (999) 999-99-99" required></div>
+        <div class="field"><label for="register-password">Пароль</label><div class="password"><input id="register-password" name="password" type="password" autocomplete="new-password" minlength="8" required><button class="show" type="button" data-show="register-password">Показать</button></div><span class="hint">Не короче 8 символов.</span></div>
+        <div class="field"><label for="register-repeat">Повторите пароль</label><div class="password"><input id="register-repeat" name="repeat" type="password" autocomplete="new-password" minlength="8" required><button class="show" type="button" data-show="register-repeat">Показать</button></div></div>
+        <label class="check"><input type="checkbox" required><span>Согласен(на) на обработку данных для создания и работы аккаунта.</span></label>
+        <button class="btn" type="submit">Создать аккаунт</button>
+        <div class="status" id="register-status" role="status"></div>
+      </form>
+    </section>
+  </main>
+</div>
+<script>
+const forms = { login: document.getElementById("login"), register: document.getElementById("register") };
+function setMode(mode) {
+  Object.entries(forms).forEach(([key, form]) => {
+    const active = key === mode;
+    form.hidden = !active;
+    const tab = document.querySelector(`[data-mode="${key}"]`);
+    tab.setAttribute("aria-selected", String(active));
+    tab.tabIndex = active ? 0 : -1;
+  });
+  document.title = (mode === "register" ? "Регистрация" : "Вход") + " — Мастерфолио";
+  history.replaceState(null, "", mode === "register" ? "?mode=register" : location.pathname);
+}
+document.querySelectorAll("[data-mode]").forEach(button => button.addEventListener("click", () => setMode(button.dataset.mode)));
+document.querySelectorAll("[data-show]").forEach(button => button.addEventListener("click", () => {
+  const input = document.getElementById(button.dataset.show);
+  input.type = input.type === "password" ? "text" : "password";
+  button.textContent = input.type === "password" ? "Показать" : "Скрыть";
+}));
+Object.entries(forms).forEach(([mode, form]) => form.addEventListener("submit", event => {
+  event.preventDefault();
+  if (!form.reportValidity()) return;
+  const status = document.getElementById(mode + "-status");
+  if (mode === "register" && form.password.value !== form.repeat.value) {
+    status.className = "status err";
+    status.textContent = "Пароли не совпадают.";
+    form.repeat.focus();
+    return;
+  }
+  form.querySelectorAll('input[type="password"]').forEach(input => { input.value = ""; });
+  status.className = "status ok";
+  status.textContent = mode === "register" ? "Форма заполнена. Аккаунт пока не создан — данные не отправлялись." : "Форма заполнена. Вход заработает после подключения сервера — пароль не отправлялся.";
+}));
+setMode(new URLSearchParams(location.search).get("mode") === "register" ? "register" : "login");
+</script>
+</body>
+</html>
