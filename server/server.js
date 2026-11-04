@@ -1,4 +1,5 @@
 const http = require("node:http");
+const https = require("node:https");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -192,15 +193,32 @@ function requireTelegram() {
   }
 }
 
-async function telegramApi(method, payload) {
-  const response = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/${method}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+async function telegramApi(method, payload, timeoutMs = 30000) {
+  const content = JSON.stringify(payload);
+  return new Promise((resolve, reject) => {
+    const request = https.request({
+      hostname: "149.154.167.220",
+      servername: "api.telegram.org",
+      path: `/bot${process.env.TELEGRAM_BOT_TOKEN}/${method}`,
+      method: "POST",
+      headers: { "Host": "api.telegram.org", "Content-Type": "application/json", "Content-Length": Buffer.byteLength(content) }
+    }, response => {
+      const chunks = [];
+      response.on("data", chunk => chunks.push(chunk));
+      response.on("end", () => {
+        try {
+          const result = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+          if (response.statusCode !== 200 || !result.ok) return reject(new Error(`Telegram API: ${result.description || response.statusCode}`));
+          resolve(result.result);
+        } catch {
+          reject(new Error("Telegram API: invalid response"));
+        }
+      });
+    });
+    request.on("error", reject);
+    request.setTimeout(timeoutMs, () => request.destroy(new Error("Telegram API timeout")));
+    request.end(content);
   });
-  const result = await response.json();
-  if (!response.ok || !result.ok) throw new Error(`Telegram API: ${result.description || response.status}`);
-  return result.result;
 }
 
 function otpHash(attemptId, code) {
@@ -352,11 +370,7 @@ async function completePhoneRegistration(req, res) {
   json(res, 201, { master }, { "Set-Cookie": sessionCookie(token) });
 }
 
-async function telegramWebhook(req, res) {
-  if (req.headers["x-telegram-bot-api-secret-token"] !== process.env.TELEGRAM_WEBHOOK_SECRET || !process.env.TELEGRAM_WEBHOOK_SECRET) {
-    throw new HttpError(401, "Неверный секрет webhook.");
-  }
-  const update = await body(req);
+async function processTelegramUpdate(update) {
   const message = update.message;
   if (message?.text?.startsWith("/start")) {
     const match = message.text.match(/^\/start\s+([0-9a-f-]{36})$/i);
@@ -370,31 +384,58 @@ async function telegramWebhook(req, res) {
       if (result.rows[0]) {
         const table = purpose === "register" ? "phone_registration_attempts" : "phone_login_attempts";
         await pool.query(`UPDATE ${table} SET telegram_chat_id = $1 WHERE id = $2`, [message.chat.id, match[1]]);
-        await telegramApi("sendMessage", {
-          chat_id: message.chat.id,
-          text: `Чтобы подтвердить номер для ${purpose === "register" ? "регистрации" : "входа"}, нажмите «Отправить контакт».`,
-          reply_markup: { keyboard: [[{ text: "Отправить контакт", request_contact: true }]], resize_keyboard: true, one_time_keyboard: true }
-        });
       }
     }
+    await telegramApi("sendMessage", {
+      chat_id: message.chat.id,
+      text: "Чтобы подтвердить номер, нажмите «Отправить контакт».",
+      reply_markup: { keyboard: [[{ text: "Отправить контакт", request_contact: true }]], resize_keyboard: true, one_time_keyboard: true }
+    });
   } else if (message?.contact) {
     if (message.contact.user_id !== message.from.id) {
       await telegramApi("sendMessage", { chat_id: message.chat.id, text: "Нужно отправить собственный контакт Telegram." });
     } else {
       const phone = normalizePhone(message.contact.phone_number);
       const result = await pool.query(
-        "SELECT id, phone, telegram_chat_id, 'login' AS purpose, created_at FROM phone_login_attempts WHERE telegram_chat_id = $1 AND used_at IS NULL AND expires_at > now() UNION ALL SELECT id, phone, telegram_chat_id, 'register' AS purpose, created_at FROM phone_registration_attempts WHERE telegram_chat_id = $1 AND used_at IS NULL AND verified_at IS NULL AND expires_at > now() ORDER BY created_at DESC LIMIT 1",
-        [message.chat.id]
+        "SELECT id, phone, telegram_chat_id, 'login' AS purpose, created_at FROM phone_login_attempts WHERE (telegram_chat_id = $1 OR telegram_chat_id IS NULL) AND phone = $2 AND used_at IS NULL AND expires_at > now() UNION ALL SELECT id, phone, telegram_chat_id, 'register' AS purpose, created_at FROM phone_registration_attempts WHERE (telegram_chat_id = $1 OR telegram_chat_id IS NULL) AND phone = $2 AND used_at IS NULL AND verified_at IS NULL AND expires_at > now() ORDER BY created_at DESC LIMIT 1",
+        [message.chat.id, phone]
       );
       const attempt = result.rows[0];
-      if (attempt && attempt.phone === phone) {
+      if (attempt) {
+        attempt.telegram_chat_id = message.chat.id;
+        const table = attempt.purpose === "register" ? "phone_registration_attempts" : "phone_login_attempts";
+        await pool.query(`UPDATE ${table} SET telegram_chat_id = $1 WHERE id = $2`, [message.chat.id, attempt.id]);
         await sendPhoneCode(attempt, attempt.purpose);
       } else {
-        await telegramApi("sendMessage", { chat_id: message.chat.id, text: "Номер не совпадает с указанным на сайте. Вернитесь на страницу и попробуйте ещё раз.", reply_markup: { remove_keyboard: true } });
+        await telegramApi("sendMessage", { chat_id: message.chat.id, text: "Не нашёл активную заявку с таким номером. Вернитесь на страницу и снова нажмите «Получить код».", reply_markup: { remove_keyboard: true } });
       }
     }
   }
+}
+
+async function telegramWebhook(req, res) {
+  if (req.headers["x-telegram-bot-api-secret-token"] !== process.env.TELEGRAM_WEBHOOK_SECRET || !process.env.TELEGRAM_WEBHOOK_SECRET) {
+    throw new HttpError(401, "Неверный секрет webhook.");
+  }
+  await processTelegramUpdate(await body(req));
   json(res, 200, { ok: true });
+}
+
+async function pollTelegram() {
+  await telegramApi("deleteWebhook", { drop_pending_updates: false });
+  let offset = 0;
+  while (true) {
+    try {
+      const updates = await telegramApi("getUpdates", { offset, timeout: 50, allowed_updates: ["message"] }, 65000);
+      for (const update of updates) {
+        offset = update.update_id + 1;
+        await processTelegramUpdate(update);
+      }
+    } catch (error) {
+      console.error(error.message);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+  }
 }
 
 async function handle(req, res) {
@@ -459,6 +500,7 @@ async function start() {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
   await pool.query(fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8"));
   server.listen(PORT, "127.0.0.1", () => console.log(`Masterfolio API listening on 127.0.0.1:${PORT}`));
+  if (process.env.TELEGRAM_BOT_TOKEN) pollTelegram().catch(error => console.error(error.message));
 }
 
 start().catch(error => {
