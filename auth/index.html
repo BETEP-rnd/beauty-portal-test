@@ -63,7 +63,7 @@
         <button type="button" role="tab" id="login-tab" data-mode="login" aria-controls="login">Вход</button>
         <button type="button" role="tab" id="register-tab" data-mode="register" aria-controls="register">Регистрация</button>
       </div>
-      <div class="demo">Макет для тестового сайта: аккаунты пока не создаются, введённые данные никуда не отправляются.</div>
+      <div class="demo">Тестовый кабинет: регистрация и вход работают через защищённый сервер. Не используйте здесь пароль от других сервисов.</div>
 
       <form class="auth-form" id="login">
         <h2>Войти в личный кабинет</h2>
@@ -106,7 +106,8 @@ document.querySelectorAll("[data-show]").forEach(button => button.addEventListen
   input.type = input.type === "password" ? "text" : "password";
   button.textContent = input.type === "password" ? "Показать" : "Скрыть";
 }));
-Object.entries(forms).forEach(([mode, form]) => form.addEventListener("submit", event => {
+const API_URL = "https://api.masterfolio.ru";
+Object.entries(forms).forEach(([mode, form]) => form.addEventListener("submit", async event => {
   event.preventDefault();
   if (!form.reportValidity()) return;
   const status = document.getElementById(mode + "-status");
@@ -116,9 +117,31 @@ Object.entries(forms).forEach(([mode, form]) => form.addEventListener("submit", 
     form.repeat.focus();
     return;
   }
-  form.querySelectorAll('input[type="password"]').forEach(input => { input.value = ""; });
-  status.className = "status ok";
-  status.textContent = mode === "register" ? "Форма заполнена. Аккаунт пока не создан — данные не отправлялись." : "Форма заполнена. Вход заработает после подключения сервера — пароль не отправлялся.";
+  const submit = form.querySelector('button[type="submit"]');
+  submit.disabled = true;
+  status.className = "status";
+  status.textContent = "Подождите…";
+  try {
+    const data = mode === "register"
+      ? { name: form.elements.name.value, email: form.elements.email.value, phone: form.elements.phone.value, password: form.elements.password.value }
+      : { email: form.elements.email.value, password: form.elements.password.value };
+    const response = await fetch(API_URL + "/api/auth/" + mode, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data)
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Не удалось выполнить запрос.");
+    form.querySelectorAll('input[type="password"]').forEach(input => { input.value = ""; });
+    status.className = "status ok";
+    status.textContent = mode === "register" ? "Аккаунт создан, вход выполнен." : "Вход выполнен.";
+  } catch (error) {
+    status.className = "status err";
+    status.textContent = error instanceof TypeError ? "Не удалось связаться с сервером. Попробуйте позже." : error.message;
+  } finally {
+    submit.disabled = false;
+  }
 }));
 setMode(new URLSearchParams(location.search).get("mode") === "register" ? "register" : "login");
 </script>
