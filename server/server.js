@@ -1,4 +1,5 @@
 const http = require("node:http");
+const https = require("node:https");
 const { execFile } = require("node:child_process");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
@@ -9,6 +10,12 @@ const PORT = Number(process.env.PORT || 3000);
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
 const BODY_LIMIT = 16 * 1024;
 const ALLOWED_ORIGINS = new Set((process.env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean));
+const YANDEX_CLIENT_ID = process.env.YANDEX_CLIENT_ID || "";
+const YANDEX_CLIENT_SECRET = process.env.YANDEX_CLIENT_SECRET || "";
+const YANDEX_REDIRECT_URI = process.env.YANDEX_REDIRECT_URI || "https://api.masterfolio.ru/api/auth/yandex/callback";
+const YANDEX_SCOPES = process.env.YANDEX_SCOPES || "login:info login:email login:default_phone";
+const YANDEX_CONSENT_VERSION = "2026-11-08";
+const RETURN_URLS = new Set((process.env.SITE_RETURN_URLS || "https://masterfolio.ru/auth/,https://betep-rnd.github.io/beauty-portal-test/auth/").split(",").map(s => s.trim().replace(/\/+$/, "")).filter(Boolean));
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
 const attempts = new Map();
 
@@ -185,6 +192,172 @@ async function logout(req, res) {
   const token = parseCookies(req)["__Host-mf_session"];
   if (token) await pool.query("DELETE FROM sessions WHERE token_hash = $1", [tokenHash(token)]);
   json(res, 200, { ok: true }, { "Set-Cookie": clearCookie() });
+}
+
+function redirect(res, location, headers = {}) {
+  res.writeHead(302, { "Cache-Control": "no-store", Location: location, ...headers });
+  res.end();
+}
+
+function returnUrlWith(returnUrl, params) {
+  const url = new URL(returnUrl);
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+  return url.toString();
+}
+
+function normalizeReturnUrl(value) {
+  let url;
+  try {
+    url = new URL(String(value || ""));
+  } catch {
+    throw new HttpError(400, "Некорректный адрес возврата.");
+  }
+  if (url.protocol !== "https:") throw new HttpError(400, "Адрес возврата должен быть по HTTPS.");
+  const key = (url.origin + url.pathname).replace(/\/+$/, "");
+  if (!RETURN_URLS.has(key)) throw new HttpError(403, "Адрес возврата не разрешён.");
+  return key + "/";
+}
+
+function yandexEnabled() {
+  return Boolean(YANDEX_CLIENT_ID && YANDEX_CLIENT_SECRET);
+}
+
+function httpsJson(urlString, { method = "GET", headers = {}, body = "" } = {}) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(urlString);
+    const request = https.request({ method, hostname: url.hostname, path: url.pathname + url.search, headers, timeout: 15000 }, response => {
+      const chunks = [];
+      let size = 0;
+      response.on("data", chunk => {
+        size += chunk.length;
+        if (size > 1024 * 1024) {
+          request.destroy(new Error("Слишком большой ответ Яндекс ID."));
+          return;
+        }
+        chunks.push(chunk);
+      });
+      response.on("end", () => {
+        let data;
+        try {
+          data = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        } catch {
+          return reject(new Error("Яндекс ID вернул некорректный ответ."));
+        }
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          return reject(new Error(data.error_description || data.error || "Ошибка Яндекс ID."));
+        }
+        resolve(data);
+      });
+    });
+    request.on("timeout", () => request.destroy(new Error("Яндекс ID не ответил вовремя.")));
+    request.on("error", reject);
+    if (body) request.write(body);
+    request.end();
+  });
+}
+
+async function yandexProfile(code) {
+  const form = new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    client_id: YANDEX_CLIENT_ID,
+    client_secret: YANDEX_CLIENT_SECRET
+  }).toString();
+  const token = await httpsJson("https://oauth.yandex.ru/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", "Content-Length": Buffer.byteLength(form) },
+    body: form
+  });
+  if (!token.access_token) throw new Error("Яндекс ID не выдал токен.");
+  return httpsJson("https://login.yandex.ru/info?format=json", { headers: { Authorization: `OAuth ${token.access_token}` } });
+}
+
+async function yandexStart(req, res) {
+  if (!yandexEnabled()) throw new HttpError(503, "Вход через Яндекс ID ещё не настроен.");
+  const url = new URL(req.url, "http://localhost");
+  const returnUrl = normalizeReturnUrl(url.searchParams.get("return"));
+  const consent = url.searchParams.get("consent") === "1";
+  const state = crypto.randomBytes(24).toString("base64url");
+  await pool.query("INSERT INTO oauth_states (state, return_url, consent, expires_at) VALUES ($1, $2, $3, now() + interval '10 minutes')", [state, returnUrl, consent]);
+  const authorize = new URL("https://oauth.yandex.ru/authorize");
+  authorize.searchParams.set("response_type", "code");
+  authorize.searchParams.set("client_id", YANDEX_CLIENT_ID);
+  authorize.searchParams.set("redirect_uri", YANDEX_REDIRECT_URI);
+  authorize.searchParams.set("scope", YANDEX_SCOPES);
+  authorize.searchParams.set("state", state);
+  redirect(res, authorize.toString(), { "Set-Cookie": `mf_oauth_state=${state}; Path=/api/auth/yandex; HttpOnly; Secure; SameSite=Lax; Max-Age=600` });
+}
+
+async function yandexCallback(req, res) {
+  if (!yandexEnabled()) throw new HttpError(503, "Вход через Яндекс ID ещё не настроен.");
+  const url = new URL(req.url, "http://localhost");
+  const code = String(url.searchParams.get("code") || "");
+  const state = String(url.searchParams.get("state") || "");
+  const expected = parseCookies(req)["mf_oauth_state"];
+  if (!state || !expected || state !== expected) throw new HttpError(400, "Сессия входа через Яндекс ID не найдена. Попробуйте снова.");
+  const stateResult = await pool.query("UPDATE oauth_states SET used_at = now() WHERE state = $1 AND used_at IS NULL AND expires_at > now() RETURNING return_url, consent", [state]);
+  const flow = stateResult.rows[0];
+  if (!flow) throw new HttpError(400, "Срок входа через Яндекс ID истёк. Попробуйте снова.");
+  const fail = reason => redirect(res, returnUrlWith(flow.return_url, { yandex: "error", reason }), { "Set-Cookie": "mf_oauth_state=; Path=/api/auth/yandex; HttpOnly; Secure; SameSite=Lax; Max-Age=0" });
+  if (!code) return fail("cancelled");
+  let profile;
+  try {
+    profile = await yandexProfile(code);
+  } catch (error) {
+    console.error(error.message);
+    return fail("yandex");
+  }
+  const yandexId = String(profile.id || "");
+  if (!yandexId) return fail("yandex");
+  let email = null;
+  try {
+    if (profile.default_email) email = normalizeEmail(profile.default_email);
+  } catch {
+    email = null;
+  }
+  let phone = null;
+  try {
+    if (profile.default_phone && profile.default_phone.number) phone = normalizePhone(profile.default_phone.number);
+  } catch {
+    phone = null;
+  }
+  const displayName = [profile.first_name, profile.last_name].filter(Boolean).join(" ").trim() || profile.display_name || profile.login || "Мастер";
+  const name = displayName.length > 60 ? displayName.slice(0, 60) : displayName;
+  let master = null;
+  const byYandex = await pool.query("SELECT id, name, email, phone FROM masters WHERE yandex_id = $1", [yandexId]);
+  if (byYandex.rows[0]) master = byYandex.rows[0];
+  if (!master && email) {
+    const byEmail = await pool.query("SELECT id, name, email, phone, yandex_id FROM masters WHERE lower(email) = lower($1)", [email]);
+    if (byEmail.rows[0]) {
+      master = byEmail.rows[0];
+      if (!master.yandex_id) await pool.query("UPDATE masters SET yandex_id = $1 WHERE id = $2", [yandexId, master.id]);
+    }
+  }
+  if (!master) {
+    if (!flow.consent) return fail("consent");
+    try {
+      const inserted = await pool.query(
+        "INSERT INTO masters (name, email, phone, password_hash, yandex_id, consent_at, consent_version) VALUES ($1, $2, $3, NULL, $4, now(), $5) RETURNING id, name, email, phone",
+        [name, email, phone, yandexId, YANDEX_CONSENT_VERSION]
+      );
+      master = inserted.rows[0];
+    } catch (error) {
+      if (error.code === "23505") {
+        const again = await pool.query("SELECT id, name, email, phone FROM masters WHERE yandex_id = $1", [yandexId]);
+        master = again.rows[0] || null;
+      } else {
+        throw error;
+      }
+    }
+  }
+  if (!master) return fail("account");
+  const token = await createSession(master.id);
+  res.writeHead(302, {
+    "Cache-Control": "no-store",
+    Location: returnUrlWith(flow.return_url, { yandex: "ok" }),
+    "Set-Cookie": [sessionCookie(token), "mf_oauth_state=; Path=/api/auth/yandex; HttpOnly; Secure; SameSite=Lax; Max-Age=0"]
+  });
+  res.end();
 }
 
 function requireTelegram() {
@@ -474,6 +647,8 @@ async function handle(req, res) {
     rateLimit(req, "phone-verify");
     return await phoneVerify(req, res);
   }
+  if (url.pathname === "/api/auth/yandex/start" && req.method === "GET") return await yandexStart(req, res);
+  if (url.pathname === "/api/auth/yandex/callback" && req.method === "GET") return await yandexCallback(req, res);
   if (url.pathname === "/api/telegram/webhook" && req.method === "POST") return await telegramWebhook(req, res);
   if (url.pathname === "/api/auth/logout" && req.method === "POST") return await logout(req, res);
   if (url.pathname === "/api/auth/me" && req.method === "GET") {
