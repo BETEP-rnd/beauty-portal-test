@@ -38,6 +38,13 @@
   .status { min-height: 0; }
   .status:empty { display: none; }
   .demo { margin-bottom: 22px; padding: 11px 13px; border: 1px dashed var(--accent); border-radius: 10px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+  .yandex-block { display: flex; flex-direction: column; gap: 10px; margin: 0 0 16px; }
+  .yandex-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 12px 16px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: #1f1a16; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .yandex-btn:hover { border-color: #fc3f1d; }
+  .yandex-btn svg { width: 22px; height: 22px; flex: none; }
+  .yandex-hint { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+  .or { display: flex; align-items: center; gap: 12px; margin: 0 0 18px; color: var(--muted); font-size: 12px; }
+  .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
   a:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
   @media (max-width: 800px) {
     .auth { grid-template-columns: minmax(0, 1fr); gap: 36px; min-height: 0; }
@@ -67,7 +74,17 @@
         <button type="button" role="tab" id="login-tab" data-mode="login" aria-controls="login">Вход</button>
         <button type="button" role="tab" id="register-tab" data-mode="register" aria-controls="register">Регистрация</button>
       </div>
-      <div class="demo">Тестовый кабинет: регистрация и вход работают через защищённый сервер. Не используйте здесь пароль от других сервисов.</div>
+      <div class="demo">Тестовый кабинет: вход по почте, номеру и через Яндекс ID. Не используйте здесь пароль от других сервисов.</div>
+
+      <div class="yandex-block">
+        <button type="button" class="yandex-btn" id="yandex-login">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#fc3f1d"/><text x="12" y="17" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#fff">Я</text></svg>
+          Войти с Яндекс ID
+        </button>
+        <label class="check"><input type="checkbox" id="yandex-agree"><span>Согласен(на) на обработку данных для входа и создания аккаунта.</span></label>
+        <p class="yandex-hint">Если аккаунта ещё нет, он создастся автоматически.</p>
+      </div>
+      <div class="or">или по почте и номеру</div>
 
       <form class="auth-form" id="login">
         <h2>Войти в личный кабинет</h2>
@@ -137,6 +154,42 @@ function maskPhone(value) {
 document.querySelectorAll('input[type="tel"]').forEach(input => input.addEventListener("input", () => { input.value = maskPhone(input.value); }));
 const registerAgree = document.getElementById("register-agree");
 const API_URL = "https://api.masterfolio.ru";
+const yandexAgree = document.getElementById("yandex-agree");
+document.getElementById("yandex-login").addEventListener("click", () => {
+  const status = document.getElementById("login-status");
+  if (!yandexAgree.checked) {
+    status.className = "status err";
+    status.textContent = "Поставьте галочку согласия на обработку данных.";
+    return;
+  }
+  const back = location.origin + location.pathname;
+  location.href = API_URL + "/api/auth/yandex/start?return=" + encodeURIComponent(back) + "&consent=1";
+});
+function handleYandexResult() {
+  const params = new URLSearchParams(location.search);
+  const result = params.get("yandex");
+  if (!result) return;
+  const status = document.getElementById("login-status");
+  if (result === "ok") {
+    status.className = "status ok";
+    status.textContent = "Вход через Яндекс ID выполнен.";
+    document.getElementById("logout").hidden = false;
+    fetch(API_URL + "/api/auth/me", { credentials: "include" }).then(response => response.ok ? response.json() : null).then(data => {
+      if (data && data.master) status.textContent = "Вход выполнен: " + data.master.name + ".";
+    }).catch(() => {});
+  } else {
+    const reasons = {
+      consent: "Нужно согласие на обработку данных.",
+      cancelled: "Вход через Яндекс ID отменён.",
+      account: "Аккаунт с такой почтой уже существует. Войдите другим способом.",
+      state: "Сессия входа истекла. Попробуйте снова.",
+      yandex: "Яндекс ID не подтвердил вход. Попробуйте снова."
+    };
+    status.className = "status err";
+    status.textContent = reasons[params.get("reason")] || "Не удалось войти через Яндекс ID.";
+  }
+  history.replaceState(null, "", location.pathname);
+}
 let loginMethod = "email", phoneAttemptId = "", registrationAttemptId = "", registrationStage = "phone";
 function resetPhoneAttempt() {
   phoneAttemptId = "";
@@ -283,6 +336,7 @@ document.getElementById("logout").addEventListener("click", async () => {
   status.textContent = "Вы вышли из аккаунта.";
 });
 resetRegistration();
+handleYandexResult();
 setMode(new URLSearchParams(location.search).get("mode") === "register" ? "register" : "login");
 </script>
 </body>

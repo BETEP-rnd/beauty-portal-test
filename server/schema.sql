@@ -68,3 +68,19 @@ CREATE TABLE IF NOT EXISTS telegram_state (
   key text PRIMARY KEY,
   value text NOT NULL
 );
+
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS yandex_id text;
+CREATE UNIQUE INDEX IF NOT EXISTS masters_yandex_unique ON masters (yandex_id);
+ALTER TABLE masters ALTER COLUMN phone DROP NOT NULL;
+ALTER TABLE masters ALTER COLUMN password_hash DROP NOT NULL;
+
+CREATE TABLE IF NOT EXISTS oauth_states (
+  state text PRIMARY KEY,
+  return_url text NOT NULL,
+  consent boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL,
+  used_at timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS oauth_states_expires_idx ON oauth_states (expires_at);
