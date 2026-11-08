@@ -171,17 +171,13 @@ function handleYandexResult() {
   if (!result) return;
   const status = document.getElementById("login-status");
   if (result === "ok") {
-    status.className = "status ok";
-    status.textContent = "Вход через Яндекс ID выполнен.";
-    document.getElementById("logout").hidden = false;
-    fetch(API_URL + "/api/auth/me", { credentials: "include" }).then(response => response.ok ? response.json() : null).then(data => {
-      if (data && data.master) status.textContent = "Вход выполнен: " + data.master.name + ".";
-    }).catch(() => {});
+    location.replace(new URL("../cabinet/?yandex=ok", location.href).href);
+    return;
   } else {
     const reasons = {
       consent: "Нужно согласие на обработку данных.",
       cancelled: "Вход через Яндекс ID отменён.",
-      account: "Аккаунт с такой почтой уже существует. Войдите другим способом.",
+      account: "Аккаунт с такой почтой или номером уже существует. Войдите по почте или номеру.",
       state: "Сессия входа истекла. Попробуйте снова.",
       yandex: "Яндекс ID не подтвердил вход. Попробуйте снова."
     };
