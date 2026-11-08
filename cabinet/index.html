@@ -22,6 +22,7 @@
   .card.soon { opacity: .6; }
   .card.soon:hover { border-color: var(--line); }
   .me { padding-top: 22px; }
+  .ynote { padding: 12px 16px; border: 1px solid var(--accent); border-radius: 12px; background: var(--panel); color: var(--accent); font-size: 13px; line-height: 1.5; }
   /* «Мои данные» — крупнее, чем панели в разделах */
   .me h2 { font-size: 14px; }
   .me label, .me .lbl { font-size: 14px; }
@@ -47,6 +48,8 @@
     <nav><a href="../">Главная</a><a href="../cabinet/" aria-current="page">Кабинет</a><a href="../price/">Прайс-лист</a><a href="../windows/">Свободные окошки</a><a href="../certs/">Сертификаты</a><a href="../booking/">Онлайн-запись</a><a href="../clients/">Мои клиенты</a></nav>
   </header>
 
+  <div class="ynote" id="ynote" hidden></div>
+
   <div class="cab">
     <div class="col">
       <div class="hello">
@@ -68,7 +71,33 @@
 <script src="../kit/trends.js?v=202610270023"></script>
 <script src="../kit/kit.js?v=202610270023"></script>
 <script>
+const API_URL = "https://api.masterfolio.ru";
+(async () => {
+const params = new URLSearchParams(location.search);
 const prof = Kit.loadProfile(), $ = id => document.getElementById(id);
+let signedIn = false;
+try {
+  const response = await fetch(API_URL + "/api/auth/me", { credentials: "include" });
+  if (response.ok) {
+    const data = await response.json();
+    const master = data && data.master;
+    if (master) {
+      signedIn = true;
+      const preset = Kit.PRESET || {};
+      const isPreset = prof.master === preset.master && prof.phone === preset.phone;
+      if (params.get("yandex") === "ok" || isPreset) {
+        if (master.name) prof.master = master.name;
+        if (master.phone) prof.phone = master.phone;
+        if (master.email) prof.email = master.email;
+      } else {
+        if (!prof.master.trim() && master.name) prof.master = master.name;
+        if (!prof.phone.trim() && master.phone) prof.phone = master.phone;
+        if (!prof.email.trim() && master.email) prof.email = master.email;
+      }
+      Kit.saveProfile(prof);
+    }
+  }
+} catch (error) {}
 function hello() {
   $("who").textContent = prof.master.trim() || "Имя мастера";
   $("facts").innerHTML = Kit.contactsHtml(prof);
@@ -81,6 +110,13 @@ if (want === "email" || want === "hideBusy") panel.focus(want);
 else if (prof.soc[want]) panel.focus(prof.soc[want].val.trim() || want === "wa" ? want + "-on" : "soc-" + want);
 Kit.saveProfile(prof);                                          // данные по умолчанию сразу видны и в разделах
 hello();
+if (params.get("yandex") === "ok") {
+  const note = document.getElementById("ynote");
+  note.hidden = false;
+  note.textContent = signedIn ? "Вход через Яндекс ID выполнен. Данные подставлены: проверьте имя, почту и телефон, добавьте соцсети." : "Вход через Яндекс ID выполнен, но данные не удалось загрузить. Обновите страницу.";
+  history.replaceState(null, "", location.pathname);
+}
+})();
 </script>
 </body>
 </html>

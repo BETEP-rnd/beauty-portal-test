@@ -333,6 +333,20 @@ async function yandexCallback(req, res) {
       if (!master.yandex_id) await pool.query("UPDATE masters SET yandex_id = $1 WHERE id = $2", [yandexId, master.id]);
     }
   }
+  if (!master && phone) {
+    const byPhone = await pool.query("SELECT id, name, email, phone, yandex_id FROM masters WHERE phone = $1", [phone]);
+    if (byPhone.rows[0]) {
+      master = byPhone.rows[0];
+      if (!master.yandex_id) await pool.query("UPDATE masters SET yandex_id = $1 WHERE id = $2", [yandexId, master.id]);
+      if (!master.email && email) {
+        try {
+          await pool.query("UPDATE masters SET email = $1 WHERE id = $2", [email, master.id]);
+        } catch (error) {
+          if (error.code !== "23505") throw error;
+        }
+      }
+    }
+  }
   if (!master) {
     if (!flow.consent) return fail("consent");
     try {
@@ -343,8 +357,12 @@ async function yandexCallback(req, res) {
       master = inserted.rows[0];
     } catch (error) {
       if (error.code === "23505") {
-        const again = await pool.query("SELECT id, name, email, phone FROM masters WHERE yandex_id = $1", [yandexId]);
+        const again = await pool.query(
+          "SELECT id, name, email, phone, yandex_id FROM masters WHERE yandex_id = $1 OR lower(email) = lower(COALESCE($2, '')) OR phone = COALESCE($3, '') ORDER BY (yandex_id = $1) DESC, created_at LIMIT 1",
+          [yandexId, email, phone]
+        );
         master = again.rows[0] || null;
+        if (master && !master.yandex_id) await pool.query("UPDATE masters SET yandex_id = $1 WHERE id = $2", [yandexId, master.id]);
       } else {
         throw error;
       }
