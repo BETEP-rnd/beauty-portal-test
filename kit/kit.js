@@ -95,15 +95,23 @@
 
   // ---------- профиль мастера: один на все разделы ----------
   const PROFILE_KEY = "beauty.profile";
-  // кабинет по умолчанию — Лариса (заказчица); пустой профиль заполняется её данными
-  const PRESET = { master: "Лариса Чурилова", phone: "+7 (906) 091-85-93", email: "", showEmail: false,
-    soc: { wa: { on: false, val: "", logo: false }, tg: { on: true, val: "@Lara_lashes", logo: false }, ig: { on: false, val: "", logo: false }, max: { on: false, val: "", logo: false } },
-    socLayout: "row", qr: "tg", qrUrl: "" };
+  const API_URL = "https://api.masterfolio.ru";
+  // нейтральный шаблон; персональные данные заказчицы из кода убраны
+  const PRESET = { master: "", phone: "", email: "", showEmail: false,
+    soc: { wa: { on: false, val: "", logo: false }, tg: { on: false, val: "", logo: false }, ig: { on: false, val: "", logo: false }, max: { on: false, val: "", logo: false } },
+    socLayout: "row", qr: "none", qrUrl: "" };
+  const LEGACY_PRESET_FINGERPRINT = "7710991b";
+  function profileFingerprint(master, phone) {
+    const value = String(master || "") + "|" + String(phone || "");
+    let hash = 2166136261;
+    for (let i = 0; i < value.length; i++) { hash ^= value.charCodeAt(i); hash = Math.imul(hash, 16777619); }
+    return (hash >>> 0).toString(16);
+  }
   function loadProfile() {
     const p = { master: "", phone: "", email: "", showEmail: false, soc: { wa: { on: false, val: "", logo: false }, tg: { on: false, val: "", logo: false }, ig: { on: false, val: "", logo: false }, max: { on: false, val: "", logo: false } },
       socLayout: "row", qr: "none", qrUrl: "" };
     let saved = loadJSON(PROFILE_KEY) || loadJSON("price.v1");     // прайс до появления профиля хранил контакты у себя
-    if (!saved || (!(saved.master || "").trim() && !digits(saved.phone))) saved = PRESET;
+    if (!saved) saved = {};
     ["master", "phone", "email", "socLayout", "qr", "qrUrl"].forEach(k => { if (typeof saved[k] === "string") p[k] = saved[k]; });
     p.showEmail = !!saved.showEmail;
     p.hideBusy = !!saved.hideBusy;                              // «Свободные окошки»: не показывать дни без окошек
@@ -471,7 +479,7 @@
     root.innerHTML = `<section class="group">
       <h2>Мастер и контакты</h2>
       <span class="hint">Заполняются один раз. В каждом разделе потом выбираете, что из этого показать на картинке.</span>
-      <div class="field"><label for="k-master" class="req">Имя мастера</label><input id="k-master" type="text" maxlength="40" placeholder="Например, Лариса Чурилова"></div>
+      <div class="field"><label for="k-master" class="req">Имя мастера</label><input id="k-master" type="text" maxlength="40" placeholder="Например, Анна Иванова"></div>
       <div class="field"><label for="k-phone" class="req">Телефон</label><input id="k-phone" type="tel" inputmode="tel" placeholder="+7 (999) 999-99-99" maxlength="18"></div>
       <div class="field"><label for="k-email">Почта</label><input id="k-email" type="email" inputmode="email" autocomplete="email" placeholder="name@mail.ru"></div>
       <span class="lbl">Соцсети — отметьте те, что есть, и впишите ник или номер</span>
@@ -607,6 +615,56 @@
     if (date && (!c.last || date > c.last)) c.last = date;
     saveClients(list); return c;
   }
+
+  // одноразово убираем сохранённый демо-профиль заказчицы, чтобы он не всплывал у других мастеров
+  function clearLegacyPreset() {
+    try {
+      const saved = loadJSON(PROFILE_KEY);
+      if (!saved || profileFingerprint(saved.master, saved.phone) !== LEGACY_PRESET_FINGERPRINT) return;
+      if (localStorage.getItem("beauty.presetCleared")) return;
+      localStorage.removeItem(PROFILE_KEY);
+      localStorage.setItem("beauty.presetCleared", "1");
+    } catch (error) {}
+  }
+  clearLegacyPreset();
+
+  // подтягиваем данные вошедшего мастера, чтобы разделы не показывали чужой профиль
+  const ACCOUNT_KEY = "beauty.accountId";
+  function syncAccountProfile() {
+    try {
+      fetch(API_URL + "/api/auth/me", { credentials: "include" })
+        .then(response => response.ok ? response.json() : null)
+        .then(data => {
+          const master = data && data.master;
+          let accountId = null;
+          try { accountId = localStorage.getItem(ACCOUNT_KEY); } catch (error) {}
+          if (!master || !master.id) {
+            try { if (accountId) localStorage.removeItem(ACCOUNT_KEY); } catch (error) {}
+            return;
+          }
+          if (accountId === String(master.id)) return;
+          const saved = loadJSON(PROFILE_KEY) || {};
+          const profile = loadProfile();
+          const isPreset = profileFingerprint(saved.master, saved.phone) === LEGACY_PRESET_FINGERPRINT;
+          const empty = !(profile.master || "").trim() && !digits(profile.phone);
+          const changedAccount = Boolean(accountId) && accountId !== String(master.id);
+          if (changedAccount || (!accountId && (empty || isPreset))) {
+            profile.master = master.name || "";
+            profile.phone = master.phone || "";
+            profile.email = master.email || "";
+            profile.showEmail = false;
+            SOCIALS.forEach(({ k }) => { profile.soc[k] = { on: false, val: "", logo: false }; });
+            saveProfile(profile);
+            try { localStorage.setItem(ACCOUNT_KEY, String(master.id)); } catch (error) {}
+            location.reload();
+            return;
+          }
+          try { localStorage.setItem(ACCOUNT_KEY, String(master.id)); } catch (error) {}
+        })
+        .catch(() => {});
+    } catch (error) {}
+  }
+  syncAccountProfile();
 
   uiTheme();
 
