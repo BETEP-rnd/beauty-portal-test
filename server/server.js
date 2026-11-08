@@ -573,7 +573,7 @@ async function processTelegramUpdate(update) {
     }
     await telegramApi("sendMessage", {
       chat_id: message.chat.id,
-      text: "Чтобы подтвердить номер, нажмите «Отправить контакт».",
+      text: "Добро пожаловать в Мастерфолио!\n\nС вами официальный Telegram-бот.\n\nС этим ботом вы сможете легко зарегистрироваться или войти в свой аккаунт.\n\nВсё просто, быстро и безопасно, займёт несколько секунд.\n\nДля завершения авторизации нажмите «Отправить контакт», чтобы подтвердить номер.",
       reply_markup: { keyboard: [[{ text: "Отправить контакт", request_contact: true }]], resize_keyboard: true, one_time_keyboard: false }
     });
   } else if (message?.contact) {
