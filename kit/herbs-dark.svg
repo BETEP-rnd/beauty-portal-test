@@ -1,15 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="190" height="190" viewBox="0 0 190 190">
-<g fill="none" stroke="#d9b07a" stroke-opacity=".08" stroke-width="1.1" stroke-linecap="round">
+<g fill="none" stroke="#d9b07a" stroke-opacity=".09" stroke-width="1.1" stroke-linecap="round">
 <path d="M38 154 C 42 126 56 108 76 98"/>
 <path d="M52 126 C 43 120 39 111 41 102 C 50 106 56 114 56 122"/>
 <path d="M57 114 C 66 112 73 105 75 96 C 66 98 60 104 57 111"/>
+</g>
+<g fill="none" stroke="#d27b8b" stroke-opacity=".10" stroke-width="1.1" stroke-linecap="round">
 <path d="M108 62 C 112 42 126 28 146 22"/>
 <path d="M122 44 C 112 38 108 29 110 20 C 119 24 125 32 125 40"/>
 <path d="M127 34 C 136 32 144 25 147 16 C 138 18 131 24 127 31"/>
 <path d="M150 152 C 152 142 158 134 168 130"/>
 <path d="M160 138 C 154 136 150 131 150 125 C 156 127 160 131 161 136"/>
 </g>
-<g fill="#d9b07a" fill-opacity=".06">
+<g fill="#d27b8b" fill-opacity=".07">
 <circle cx="22" cy="58" r="2"/><circle cx="96" cy="166" r="1.7"/><circle cx="178" cy="74" r="1.6"/><circle cx="70" cy="24" r="1.4"/>
 </g>
 </svg>
