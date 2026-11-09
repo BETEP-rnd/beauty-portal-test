@@ -606,13 +606,21 @@ async function registrationPhoneStart(req, res) {
   const phone = normalizePhone(data.phone);
   const existing = await pool.query("SELECT 1 FROM masters WHERE phone = $1", [phone]);
   if (existing.rows[0]) throw new HttpError(409, "Аккаунт с таким номером уже существует. Попробуйте войти.");
-  const result = await pool.query(
-    "INSERT INTO phone_registration_attempts (phone, expires_at) VALUES ($1, now() + interval '10 minutes') RETURNING id",
+  const active = await pool.query(
+    "SELECT id FROM phone_registration_attempts WHERE phone = $1 AND used_at IS NULL AND verified_at IS NULL AND expires_at > now() ORDER BY created_at DESC LIMIT 1",
     [phone]
   );
+  let attemptId = active.rows[0] && active.rows[0].id;
+  if (!attemptId) {
+    const result = await pool.query(
+      "INSERT INTO phone_registration_attempts (phone, expires_at) VALUES ($1, now() + interval '10 minutes') RETURNING id",
+      [phone]
+    );
+    attemptId = result.rows[0].id;
+  }
   json(res, 200, {
-    attemptId: result.rows[0].id,
-    botUrl: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME}?start=${result.rows[0].id}`
+    attemptId,
+    botUrl: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME}?start=${attemptId}`
   });
 }
 
