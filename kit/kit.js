@@ -701,6 +701,9 @@
         .catch(() => {});
     } catch (error) {}
   }
+  let cachedAccount = null;
+  try { cachedAccount = localStorage.getItem(ACCOUNT_KEY); } catch (error) {}
+  updateAccountNav(Boolean(cachedAccount));
   syncAccountProfile();
 
   uiTheme();

@@ -212,7 +212,7 @@ a.chip.off:hover { color: var(--accent); border-color: var(--accent); }
 /* подсветка поля, куда привели из раздела */
 .flash { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 10px; }
 /* стабильная шапка: не прыгает при переходах */
-html { scrollbar-gutter: stable; }
+html { overflow-y: scroll; scrollbar-gutter: stable; }
 header.top { position: sticky; top: 0; z-index: 50; align-items: center; background: var(--page-bg, var(--bg)); padding: 12px 0; }
-header.top h1 { min-width: 300px; }
-@media (max-width: 700px) { header.top h1 { min-width: 0; } }
+header.top h1 { width: 360px; flex: 0 0 360px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+@media (max-width: 900px) { header.top h1 { width: auto; flex: 1 1 auto; } }
