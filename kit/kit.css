@@ -27,9 +27,15 @@
 [hidden] { display: none !important; }
 html, body { margin: 0; }
 body {
-  background: var(--page-bg, var(--bg)); color: var(--page-text, var(--text)); font-family: var(--ui); font-size: 15px;
+  background-color: var(--page-bg, var(--bg));
+  background-image: url("herbs-light.svg?v=202611091500");
+  background-repeat: repeat;
+  background-size: 190px 190px;
+  color: var(--page-text, var(--text)); font-family: var(--ui); font-size: 15px;
   padding: calc(22px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(40px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
 }
+@media (prefers-color-scheme: dark) { :root:not([data-ui]) body { background-image: url("herbs-dark.svg?v=202611091500"); } }
+:root[data-ui="dark"] body, :root[data-ui="mix"] body { background-image: url("herbs-dark.svg?v=202611091500"); }
 .wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
 header.top { display: flex; align-items: baseline; gap: 14px 22px; flex-wrap: wrap; }
 header.top h1 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 40px; line-height: 1; }
