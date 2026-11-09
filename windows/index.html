@@ -232,13 +232,13 @@ function drawList(top, bottom, days, t, P) {                    // день сл
     const label = caseOf(sd, it.label); ctx.fillText(label, x, baseY);
     const lw = ctx.measureText(label).width;
     ctx.font = fontOf(stt, ts);
-    // время — колонкой с общим левым краем: цифры в шрифте разной ширины, по правому краю строки «гуляют»
-    const timeW = Math.max(ctx.measureText(caseOf(stt, "занято")).width, ...days.flatMap(dd => dd.iv.map(([a, b]) => ctx.measureText(caseOf(stt, `${hm(a)}–${hm(b)}`)).width)));
-    const tx = x + colW - timeW;
+    // время — по правому краю колонки: все строки заканчиваются на одной линии
+    const timeRight = x + colW;
     lines.forEach((ln, i) => {
-      const text = caseOf(stt, ln), w = ctx.measureText(text).width;
-      ctx.fillStyle = d.iv.length ? dr.paint(stt.color, tx, tx + w) : t.muted; ctx.fillText(text, tx, baseY + i * s * 1.35);
-      if (i === 0) { ctx.fillStyle = t.dots; for (let px = x + lw + 16; px < tx - 12; px += 13) { ctx.beginPath(); ctx.arc(px, baseY - s * .12, 1.8, 0, Math.PI * 2); ctx.fill(); } }
+      const text = caseOf(stt, ln), w = ctx.measureText(text).width, lineX = timeRight - w;
+      ctx.fillStyle = d.iv.length ? dr.paint(stt.color, lineX, timeRight) : t.muted;
+      ctx.textAlign = "right"; ctx.fillText(text, timeRight, baseY + i * s * 1.35);
+      if (i === 0) { ctx.fillStyle = t.dots; for (let px = x + lw + 16; px < lineX - 12; px += 13) { ctx.beginPath(); ctx.arc(px, baseY - s * .12, 1.8, 0, Math.PI * 2); ctx.fill(); } }
     });
   });
 }
