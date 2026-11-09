@@ -629,6 +629,13 @@
   clearLegacyPreset();
 
   // подтягиваем данные вошедшего мастера, чтобы разделы не показывали чужой профиль
+  function revealActiveNav() {
+    const nav = document.querySelector("header.top nav");
+    const active = nav && nav.querySelector('a[aria-current="page"]');
+    if (!nav || !active || nav.scrollWidth <= nav.clientWidth + 1) return;
+    nav.scrollLeft = Math.max(0, active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2);
+  }
+
   const ACCOUNT_KEY = "beauty.accountId";
   function updateAccountNav(loggedIn) {
     try {
@@ -704,6 +711,8 @@
   let cachedAccount = null;
   try { cachedAccount = localStorage.getItem(ACCOUNT_KEY); } catch (error) {}
   updateAccountNav(Boolean(cachedAccount));
+  setTimeout(revealActiveNav, 60);
+  window.addEventListener("load", revealActiveNav);
   syncAccountProfile();
 
   uiTheme();

@@ -239,3 +239,20 @@ header.top { position: sticky; top: 0; z-index: 50; display: grid; grid-template
 header.top h1 { grid-area: title; width: auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 header.top nav { grid-area: nav; }
 .uiswitch { grid-area: switch; justify-self: end; margin-left: 0; }
+
+/* телефон: шапка в три ряда — название, прокручиваемое меню, переключатель темы на всю ширину */
+@media (max-width: 700px) {
+  header.top { grid-template-columns: minmax(0, 1fr); grid-template-areas: "title" "nav" "switch"; column-gap: 0; row-gap: 10px; }
+  header.top nav { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch; }
+  header.top nav::-webkit-scrollbar { display: none; }
+  header.top nav a { flex: 0 0 auto; white-space: nowrap; }
+  .uiswitch { justify-self: stretch; width: 100%; margin-left: 0; }
+  .uiswitch button { flex: 1 1 0; min-width: 0; padding: 8px 4px; font-size: 12px; }
+}
+@media (max-width: 380px) {
+  header.top nav a { padding: 5px 9px; font-size: 12px; }
+  .uiswitch button { font-size: 11px; }
+}
+
+/* липкая шапка: подложка в цвет темы, чтобы контент не просвечивал при прокрутке */
+header.top { background: var(--page-bg, var(--bg)); background: color-mix(in srgb, var(--page-bg, var(--bg)) 86%, transparent); -webkit-backdrop-filter: blur(14px) saturate(1.05); backdrop-filter: blur(14px) saturate(1.05); }
