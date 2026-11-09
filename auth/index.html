@@ -290,12 +290,20 @@ Object.entries(forms).forEach(([mode, form]) => form.addEventListener("submit", 
       url = "/api/auth/phone/verify";
       data = { attemptId: phoneAttemptId, code: form.elements.code.value };
     }
-    const response = await fetch(API_URL + url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(data)
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    let response;
+    try {
+      response = await fetch(API_URL + url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || "Не удалось выполнить запрос.");
     if (mode === "register" && result.botUrl) {
@@ -330,7 +338,9 @@ Object.entries(forms).forEach(([mode, form]) => form.addEventListener("submit", 
     status.className = "status ok";
   } catch (error) {
     status.className = "status err";
-    status.textContent = error instanceof TypeError ? "Не удалось связаться с сервером. Попробуйте позже." : error.message;
+    if (error.name === "AbortError") status.textContent = "Сервер долго не отвечает. Нажмите ещё раз: заявка сохранится, и присланный код останется действительным.";
+    else if (error instanceof TypeError) status.textContent = "Не удалось связаться с сервером. Проверьте интернет и нажмите ещё раз.";
+    else status.textContent = error.message;
   } finally {
     submit.disabled = mode === "register" && registrationStage === "complete" && !form.elements.consent.checked;
   }
