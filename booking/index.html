@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f8f2ec">
 <title>Онлайн-запись</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500&family=Manrope:wght@400;500;600;700&family=Montserrat:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="../kit/kit.css?v=202611092500">
+<link rel="stylesheet" href="../kit/kit.css?v=202611092600">
 <script>try { var u = localStorage.getItem("beauty.ui"); if (u) document.documentElement.dataset.ui = u; } catch (e) {}</script>
 <style>
   /* Страница записи глазами клиента: шаги сверху вниз — услуга, день, время, контакты. */
@@ -50,14 +50,15 @@
   .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .cal-head b { font-size: 16px; text-transform: capitalize; }
   .cal-head .icon { width: 40px; }
-  .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; width: 100%; max-width: 520px; margin: 0 auto; }
   .cal .wd { text-align: center; font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding-bottom: 2px; }
-  .cal-day { aspect-ratio: 1; border: 1px solid transparent; border-radius: 10px; background: none; color: var(--text); font: inherit; font-size: 15px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 0; }
+  .cal-day { height: 56px; border: 1px solid transparent; border-radius: 10px; background: none; color: var(--text); font: inherit; font-size: 14px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 2px 0; }
   .cal-day:disabled { color: var(--muted); opacity: .45; cursor: default; }
   .cal-day.free { border-color: var(--accent); background: var(--field); font-weight: 600; }
-  .cal-day.free small { font-size: 10px; font-weight: 400; color: var(--accent); }
+  .cal-day.free small { font-size: 9px; font-weight: 400; color: var(--accent); }
   .cal-day[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
   .cal-day[aria-pressed="true"] small { color: inherit; }
+  @media (max-width: 520px) { .cal { max-width: 100%; } .cal-day { height: 48px; font-size: 13px; } .cal-day.free small { font-size: 8px; } }
   .svc-item:disabled { opacity: .45; cursor: default; }
   .demo a { color: var(--accent); }
   .done .big { font-family: var(--display); font-size: 34px; color: var(--accent); }
@@ -133,9 +134,9 @@
   </div>
 </div>
 
-<script src="../kit/backgrounds.js?v=202611092500"></script>
-<script src="../kit/trends.js?v=202611092500"></script>
-<script src="../kit/kit.js?v=202611092500"></script>
+<script src="../kit/backgrounds.js?v=202611092600"></script>
+<script src="../kit/trends.js?v=202611092600"></script>
+<script src="../kit/kit.js?v=202611092600"></script>
 <script>
 // Демо: окошки берутся из раздела «Свободные окошки», услуги и цены — из «Прайс-листа» этого браузера.
 // Запись никуда не отправляется и не сохраняется.
