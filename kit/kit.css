@@ -63,8 +63,8 @@ input[type="text"], input[type="tel"], input[type="url"], input[type="email"], i
 }
 input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .hint { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
-.seg { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.seg button { flex: 1; border: 0; background: var(--field); color: var(--text); font: inherit; font-size: 13.5px; padding: 10px 6px; cursor: pointer; }
+.seg { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg button { flex: 1 1 0; min-width: 0; white-space: nowrap; border: 0; background: var(--field); color: var(--text); font: inherit; font-size: 13.5px; padding: 10px 6px; cursor: pointer; }
 .seg button + button { border-left: 1px solid var(--line); }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 
@@ -211,3 +211,8 @@ a.chip.off span { color: var(--accent); font-weight: 600; }
 a.chip.off:hover { color: var(--accent); border-color: var(--accent); }
 /* подсветка поля, куда привели из раздела */
 .flash { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 10px; }
+/* стабильная шапка: не прыгает при переходах */
+html { scrollbar-gutter: stable; }
+header.top { position: sticky; top: 0; z-index: 50; align-items: center; background: var(--page-bg, var(--bg)); padding: 12px 0; }
+header.top h1 { min-width: 300px; }
+@media (max-width: 700px) { header.top h1 { min-width: 0; } }
