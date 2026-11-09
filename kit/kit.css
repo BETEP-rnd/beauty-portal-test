@@ -235,7 +235,7 @@ a.chip.off:hover { color: var(--accent); border-color: var(--accent); }
 .flash { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 10px; }
 /* стабильная шапка: не прыгает при переходах */
 html { overflow-y: scroll; scrollbar-gutter: stable; }
-header.top { position: sticky; top: 0; z-index: 50; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "title title" "nav switch"; align-items: center; column-gap: 22px; row-gap: 12px; background: var(--page-bg, var(--bg)); padding: 12px 0; }
+header.top { position: sticky; top: 0; z-index: 50; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "title title" "nav switch"; align-items: center; column-gap: 22px; row-gap: 12px; background: transparent; padding: 12px 0; }
 header.top h1 { grid-area: title; width: auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 header.top nav { grid-area: nav; }
 .uiswitch { grid-area: switch; justify-self: end; margin-left: 0; }
