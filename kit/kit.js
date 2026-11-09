@@ -630,6 +630,41 @@
 
   // подтягиваем данные вошедшего мастера, чтобы разделы не показывали чужой профиль
   const ACCOUNT_KEY = "beauty.accountId";
+  function updateAccountNav(loggedIn) {
+    try {
+      document.querySelectorAll("header.top nav").forEach(nav => {
+        const home = Array.from(nav.querySelectorAll("a")).find(link => link.textContent.trim() === "Главная");
+        if (home) home.hidden = Boolean(loggedIn);
+        let exit = nav.querySelector("[data-account-exit]");
+        if (loggedIn) {
+          if (!exit) {
+            exit = document.createElement("button");
+            exit.type = "button";
+            exit.dataset.accountExit = "1";
+            exit.textContent = "Выйти";
+            exit.setAttribute("aria-label", "Выйти из аккаунта");
+            exit.style.cssText = "color:var(--page-muted,var(--muted));background:none;border:1px solid var(--page-line,var(--line));border-radius:99px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;";
+            exit.addEventListener("mouseenter", () => { exit.style.color = "var(--accent)"; exit.style.borderColor = "var(--accent)"; });
+            exit.addEventListener("mouseleave", () => { exit.style.color = "var(--page-muted,var(--muted))"; exit.style.borderColor = "var(--page-line,var(--line))"; });
+            exit.addEventListener("click", logoutAccount);
+            nav.appendChild(exit);
+          }
+          exit.hidden = false;
+        } else if (exit) {
+          exit.remove();
+        }
+      });
+    } catch (error) {}
+  }
+  async function logoutAccount() {
+    if (!confirm("Выйти из аккаунта?")) return;
+    try { await fetch(API_URL + "/api/auth/logout", { method: "POST", credentials: "include" }); } catch (error) {}
+    try {
+      localStorage.removeItem(ACCOUNT_KEY);
+      localStorage.removeItem(PROFILE_KEY);
+    } catch (error) {}
+    location.href = "../auth/";
+  }
   function syncAccountProfile() {
     try {
       fetch(API_URL + "/api/auth/me", { credentials: "include" })
@@ -639,9 +674,11 @@
           let accountId = null;
           try { accountId = localStorage.getItem(ACCOUNT_KEY); } catch (error) {}
           if (!master || !master.id) {
+            updateAccountNav(false);
             try { if (accountId) localStorage.removeItem(ACCOUNT_KEY); } catch (error) {}
             return;
           }
+          updateAccountNav(true);
           if (accountId === String(master.id)) return;
           const saved = loadJSON(PROFILE_KEY) || {};
           const profile = loadProfile();
