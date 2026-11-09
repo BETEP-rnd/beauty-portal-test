@@ -6,14 +6,15 @@
 <meta name="theme-color" content="#f7f3ee">
 <title>Подарочные сертификаты</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Raleway:ital,wght@0,400;0,600;0,700;1,400&family=Manrope:wght@400;600;700&family=Nunito:ital,wght@0,400;0,700;1,400&family=Comfortaa:wght@400;700&family=Oswald:wght@400;600&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Lora:ital,wght@0,400;0,700;1,400&family=Prata&family=Forum&family=Poiret+One&family=Marck+Script&family=Bad+Script&family=Caveat:wght@400;700&family=Lobster&family=Amatic+SC:wght@400;700&display=swap">
-<link rel="stylesheet" href="../kit/kit.css?v=202610270023">
+<link rel="stylesheet" href="../kit/kit.css?v=202611090805">
 <script>try { var u = localStorage.getItem("beauty.ui"); if (u) document.documentElement.dataset.ui = u; } catch (e) {}</script>
 <style>
   /* Проверка и журнал: карточка сертификата, статусы, список. */
   .tab > .pinbar { display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
   .tab > .pinbar:empty { display: none; }
-  .tab > #mode { flex-direction: row; }
+  .tab > #mode { flex-direction: row; gap: 0; }
   .pinbar input[type="password"] { width: 140px; flex: 0 0 auto; }
+  .pinbar a { color: var(--accent); }
   .big { font-family: var(--display); font-size: 24px; color: var(--accent); }
   .certcard { border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
   .certcard .no { font-family: var(--display); font-size: 30px; color: var(--accent); }
@@ -67,7 +68,7 @@
             </div>
             <div class="row">
               <div class="field"><label for="sum">Сумма, руб.</label><input id="sum" type="number" inputmode="numeric" min="100" step="100" value="3000"></div>
-              <div class="field"><span class="lbl">Номер</span><span class="big" id="noView">выдаст таблица</span></div>
+              <div class="field"><span class="lbl">Номер</span><span class="big" id="noView">присвоит сервер</span></div>
             </div>
             <div class="row">
               <div class="field"><label for="issued">Дата выдачи</label><input id="issued" type="date"></div>
@@ -138,13 +139,13 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="../kit/backgrounds.js?v=202610270023"></script>
-<script src="../kit/trends.js?v=202610270023"></script>
-<script src="../kit/kit.js?v=202610270023"></script>
+<script src="../kit/backgrounds.js?v=202611090805"></script>
+<script src="../kit/trends.js?v=202611090805"></script>
+<script src="../kit/kit.js?v=202611090805"></script>
 <script>
-// Таблица сертификатов Ларисы (Google Apps Script) — та же, что у прежней страницы: нумерация и журнал продолжаются.
-const API_URL = "https://script.google.com/macros/s/AKfycbw4OY0qnxUQaLf4g9iP5bOmeVE3cwwKJPqs8YDy5VhO-lEOzIEKZe7FiUyjuB2FXPJM/exec";
-const PIN_KEY = "masterfolio_pin";                              // PIN хранится отдельно для портала
+// Сертификаты хранятся на сервере в PostgreSQL; у каждого мастера своя нумерация и журнал.
+const API_URL = "https://api.masterfolio.ru";
+let signedIn = false;
 const TEXTS = [
   { k: "top", name: "Надпись сверху" }, { k: "title", name: "Заголовок" }, { k: "purpose", name: "На что" },
   { k: "recipient", name: "Кому" }, { k: "amount", name: "Сумма" }, { k: "master", name: "Мастер" },
@@ -255,43 +256,45 @@ function paint(t) {
 let raf = 0;
 function changed() { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); store.set(KEY, JSON.stringify(S)); }
 
-// ---------- связь с таблицей ----------
-async function api(action, payload) {
-  const pin = store.get(PIN_KEY);
-  if (!pin) { renderPin(true); throw { code: "pin", message: "Введите PIN вверху формы." }; }
-  let res;
+// ---------- связь с сервером ----------
+async function api(path, payload) {
+  let response;
   try {
-    // text/plain — без предварительного CORS-запроса, так Google Apps Script принимает POST со сторонней страницы
-    const r = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action, pin, ...payload }) });
-    res = await r.json();
-  } catch (e) {
-    throw { message: "Нет связи с таблицей. Проверьте интернет и попробуйте ещё раз." };
+    response = await fetch(API_URL + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(payload || {})
+    });
+  } catch (error) {
+    throw { message: "Нет связи с сервером. Проверьте интернет и попробуйте ещё раз." };
   }
-  if (!res.ok) {
-    if (res.code === "pin") { store.del(PIN_KEY); renderPin(true); }
-    throw res;
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (response.status === 401) { signedIn = false; renderAuth(); }
+    throw { ...result, message: result.error || "Не удалось выполнить запрос." };
   }
-  return res;
+  return result;
 }
-function renderPin(ask) {
+function renderAuth() {
   const bar = $("pinbar"); bar.textContent = "";
-  if (!ask && store.get(PIN_KEY)) {
-    const s = document.createElement("span"); s.textContent = "PIN сохранён в этом браузере";
-    const b = document.createElement("button"); b.className = "linkbtn"; b.type = "button"; b.textContent = "сменить";
-    b.onclick = () => { store.del(PIN_KEY); renderPin(true); };
-    bar.append(s, b); return;
+  if (!signedIn) {
+    const s = document.createElement("span"); s.textContent = "Войдите в аккаунт, чтобы выписывать сертификаты.";
+    const a = document.createElement("a"); a.href = "../auth/"; a.textContent = "Войти";
+    bar.append(s, a);
   }
-  const lab = document.createElement("label"); lab.htmlFor = "pin"; lab.textContent = "PIN для таблицы:";
-  const inp = document.createElement("input"); inp.type = "password"; inp.inputMode = "numeric"; inp.placeholder = "PIN"; inp.id = "pin"; inp.autocomplete = "off";
-  const b = document.createElement("button"); b.className = "btn ghost"; b.type = "button"; b.textContent = "Ок"; b.style.padding = "10px 14px";
-  const save = async () => {
-    const v = inp.value.trim(); if (!v) return;
-    store.set(PIN_KEY, v); b.disabled = true;
-    try { await api("ping", {}); renderPin(false); }
-    catch (e) { const i = bar.querySelector("input"); if (i) i.placeholder = e.code === "pin" ? "Неверный PIN" : "PIN"; if (e.code !== "pin") renderPin(false); }
-  };
-  b.onclick = save; inp.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); save(); } };
-  bar.append(lab, inp, b);
+  $("issue").disabled = !signedIn;
+  $("checkBtn").disabled = !signedIn;
+  $("reload").disabled = !signedIn;
+}
+async function checkAuth() {
+  try {
+    const response = await fetch(API_URL + "/api/auth/me", { credentials: "include" });
+    signedIn = response.ok;
+  } catch (error) {
+    signedIn = false;
+  }
+  renderAuth();
 }
 
 // ---------- вкладка «Новый» ----------
@@ -304,7 +307,7 @@ function formData() {
 function refreshNew() {
   const d = issued || formData();
   $("until").textContent = ruDate(d.until);
-  $("noView").textContent = issued ? "№ " + noFmt(issued.no) : "выдаст таблица";
+  $("noView").textContent = issued ? "№ " + noFmt(issued.no) : "присвоит сервер";
   changed();
 }
 function setStatus(id, text, kind) { const s = $(id); s.textContent = text; s.className = "status" + (kind ? " " + kind : ""); }
@@ -316,16 +319,16 @@ $("issue").addEventListener("click", async () => {
   if (!d.sum) { setStatus("status", "Укажите сумму.", "err"); $("sum").focus(); return; }
   const err = Kit.profileError(prof);
   if (err) { setStatus("status", err, "err"); return; }
-  $("issue").disabled = true; setStatus("status", "Записываю в таблицу…");
+  $("issue").disabled = true; setStatus("status", "Сохраняю сертификат…");
   try {
-    const res = await api("create", d);
+    const res = await api("/api/certs/create", d);
     issued = { ...d, no: res.cert.no };
     lockForm(true); refreshNew();
     $("issue").hidden = true; $("afterIssue").hidden = false; $("again").hidden = false;
-    setStatus("status", `Сертификат № ${noFmt(issued.no)} записан в таблицу. Скачайте или отправьте картинку.`, "ok");
+    setStatus("status", `Сертификат № ${noFmt(issued.no)} сохранён. Скачайте или отправьте картинку.`, "ok");
   } catch (e) {
     setStatus("status", e.message || e.error || "Не получилось записать сертификат.", "err");
-  } finally { $("issue").disabled = false; }
+  } finally { $("issue").disabled = !signedIn; }
 });
 Kit.output({ download: $("download"), share: $("share"), status: $("status") }, canvas, draw,
   () => `Сертификат_${noFmt(issued.no)}_${Kit.safeName(issued.who || "без_имени")}.png`,
@@ -372,7 +375,7 @@ function showCert(c, note) {
       no2.onclick = () => { cf.remove(); use.hidden = false; };
       yes.onclick = async () => {
         yes.disabled = no2.disabled = true;
-        try { const r = await api("use", { no: c.no }); showCert(r.cert, "Сертификат погашен."); }
+        try { const r = await api("/api/certs/use", { no: c.no }); showCert(r.cert, "Сертификат погашен."); }
         catch (err) { if (err.cert) showCert(err.cert); setStatus("checkStatus", err.message || err.error || "Не получилось погасить.", "err"); }
       };
       row.append(yes, no2); cf.append(q, row); card.append(cf);
@@ -382,8 +385,8 @@ function showCert(c, note) {
   box.append(card);
 }
 async function checkNo(n) {
-  setStatus("checkStatus", "Ищу в таблице…"); $("checkResult").textContent = "";
-  try { const r = await api("check", { no: n }); setStatus("checkStatus", ""); showCert(r.cert); }
+  setStatus("checkStatus", "Ищу сертификат…"); $("checkResult").textContent = "";
+  try { const r = await api("/api/certs/check", { no: n }); setStatus("checkStatus", ""); showCert(r.cert); }
   catch (err) { setStatus("checkStatus", err.message || err.error || "Не получилось проверить.", "err"); }
 }
 function doCheck() {
@@ -402,7 +405,7 @@ async function loadLog() {
   const t = ++logTicket;
   setStatus("logStatus", "Загружаю…"); $("reload").disabled = true;
   try {
-    const r = await api("list", {});
+    const r = await api("/api/certs/list", {});
     if (t !== logTicket) return;
     $("log").textContent = "";
     setStatus("logStatus", r.items.length ? "" : "Сертификатов пока нет.");
@@ -447,7 +450,7 @@ $("mode").addEventListener("click", e => { const b = e.target.closest("[data-k]"
 $("issued").value = isoToday();
 const giftTo = new URLSearchParams(location.search).get("to");   // из «Моих клиентов»: сертификат ко дню рождения
 if (giftTo) $("who").value = giftTo.slice(0, 60);
-renderPin(!store.get(PIN_KEY));
+checkAuth();
 tabs.show(tabs.current); showMode("new"); refreshNew();
 Promise.all([...fonts.fontsInUse(), '150px "Great Vibes"', '500 50px "Cormorant Garamond"', 'italic 38px "Cormorant Garamond"', '400 22px "Montserrat"']
   .map(f => document.fonts.load(f, "Gift Certificate ПОДАРОЧНЫЙ СЕРТИФИКАТ 0123456789")))

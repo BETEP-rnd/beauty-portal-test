@@ -84,3 +84,19 @@ CREATE TABLE IF NOT EXISTS oauth_states (
 );
 
 CREATE INDEX IF NOT EXISTS oauth_states_expires_idx ON oauth_states (expires_at);
+
+CREATE TABLE IF NOT EXISTS certificates (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  master_id uuid NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+  number integer NOT NULL,
+  recipient varchar(60) NOT NULL,
+  amount integer NOT NULL CHECK (amount > 0),
+  issued_on date NOT NULL,
+  expires_on date NOT NULL,
+  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'redeemed')),
+  redeemed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (master_id, number)
+);
+
+CREATE INDEX IF NOT EXISTS certificates_master_idx ON certificates (master_id, number DESC);

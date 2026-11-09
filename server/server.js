@@ -378,6 +378,130 @@ async function yandexCallback(req, res) {
   res.end();
 }
 
+async function requireMaster(req) {
+  const master = await currentMaster(req);
+  if (!master) throw new HttpError(401, "Войдите в аккаунт.");
+  return master;
+}
+
+const isoDay = value => {
+  if (!value) return "";
+  if (value instanceof Date) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+  return String(value).slice(0, 10);
+};
+const ruDay = value => {
+  const iso = isoDay(value);
+  if (!iso) return "";
+  const [year, month, day] = iso.split("-");
+  return `${day}.${month}.${year}`;
+};
+const certJson = row => ({
+  no: row.number,
+  who: row.recipient,
+  sum: row.amount,
+  issued: isoDay(row.issued_on),
+  until: isoDay(row.expires_on),
+  status: row.status === "redeemed" ? "Использован" : "Активен",
+  used: row.redeemed_at ? ruDay(row.redeemed_at) : ""
+});
+
+function certNumber(value) {
+  const number = Number.parseInt(String(value || ""), 10);
+  if (!Number.isInteger(number) || number < 1 || number > 100000000) throw new HttpError(400, "Укажите номер сертификата.");
+  return number;
+}
+function certRecipient(value) {
+  const who = String(value || "").trim().replace(/\s+/g, " ");
+  if (who.length < 2 || who.length > 60) throw new HttpError(400, "Укажите, кому дарится сертификат.");
+  return who;
+}
+function certAmount(value) {
+  const sum = Number(value);
+  if (!Number.isInteger(sum) || sum < 100 || sum > 10000000) throw new HttpError(400, "Укажите сумму сертификата.");
+  return sum;
+}
+function certIssued(value) {
+  const iso = String(value || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) throw new HttpError(400, "Укажите дату выдачи.");
+  return iso;
+}
+function certTerm(value) {
+  const term = Number(value);
+  if (![1, 2, 3, 6, 12].includes(term)) throw new HttpError(400, "Выберите срок действия.");
+  return term;
+}
+
+async function certList(req, res) {
+  const master = await requireMaster(req);
+  const result = await pool.query("SELECT * FROM certificates WHERE master_id = $1 ORDER BY number DESC LIMIT 500", [master.id]);
+  json(res, 200, { items: result.rows.map(certJson) });
+}
+
+async function certCreate(req, res) {
+  const master = await requireMaster(req);
+  const data = await body(req);
+  const who = certRecipient(data.who);
+  const sum = certAmount(data.sum);
+  const issued = certIssued(data.issued);
+  const term = certTerm(data.term);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1::text))", [master.id]);
+    const next = await client.query("SELECT COALESCE(MAX(number), 0) + 1 AS number FROM certificates WHERE master_id = $1", [master.id]);
+    const inserted = await client.query(
+      "INSERT INTO certificates (master_id, number, recipient, amount, issued_on, expires_on) VALUES ($1, $2, $3, $4, $5::date, ($5::date + ($6::int || ' months')::interval)::date) RETURNING *",
+      [master.id, next.rows[0].number, who, sum, issued, term]
+    );
+    await client.query("COMMIT");
+    json(res, 201, { cert: certJson(inserted.rows[0]) });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function certCheck(req, res) {
+  const master = await requireMaster(req);
+  const data = await body(req);
+  const number = certNumber(data.no);
+  const result = await pool.query("SELECT * FROM certificates WHERE master_id = $1 AND number = $2", [master.id, number]);
+  if (!result.rows[0]) throw new HttpError(404, "Сертификат с таким номером не найден.");
+  json(res, 200, { cert: certJson(result.rows[0]) });
+}
+
+async function certUse(req, res) {
+  const master = await requireMaster(req);
+  const data = await body(req);
+  const number = certNumber(data.no);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const found = await client.query("SELECT * FROM certificates WHERE master_id = $1 AND number = $2 FOR UPDATE", [master.id, number]);
+    const row = found.rows[0];
+    if (!row) throw new HttpError(404, "Сертификат с таким номером не найден.");
+    if (row.status === "redeemed") {
+      await client.query("ROLLBACK");
+      return json(res, 409, { error: "Сертификат уже погашен.", cert: certJson(row) });
+    }
+    const updated = await client.query("UPDATE certificates SET status = 'redeemed', redeemed_at = now() WHERE id = $1 RETURNING *", [row.id]);
+    await client.query("COMMIT");
+    json(res, 200, { cert: certJson(updated.rows[0]) });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 function requireTelegram() {
   if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_BOT_USERNAME || !process.env.OTP_SECRET) {
     throw new HttpError(503, "Telegram-бот ещё не подключён.");
@@ -667,6 +791,11 @@ async function handle(req, res) {
   }
   if (url.pathname === "/api/auth/yandex/start" && req.method === "GET") return await yandexStart(req, res);
   if (url.pathname === "/api/auth/yandex/callback" && req.method === "GET") return await yandexCallback(req, res);
+  if (url.pathname === "/api/certs/list" && req.method === "POST") return await certList(req, res);
+  if (url.pathname === "/api/certs/create" && req.method === "POST") return await certCreate(req, res);
+  if (url.pathname === "/api/certs/check" && req.method === "POST") return await certCheck(req, res);
+  if (url.pathname === "/api/certs/use" && req.method === "POST") return await certUse(req, res);
+  if (url.pathname === "/api/certs/ping" && req.method === "GET") { await requireMaster(req); return json(res, 200, { ok: true }); }
   if (url.pathname === "/api/telegram/webhook" && req.method === "POST") return await telegramWebhook(req, res);
   if (url.pathname === "/api/auth/logout" && req.method === "POST") return await logout(req, res);
   if (url.pathname === "/api/auth/me" && req.method === "GET") {

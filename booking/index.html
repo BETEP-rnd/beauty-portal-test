@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f7f3ee">
 <title>Онлайн-запись</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500&family=Montserrat:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="../kit/kit.css?v=202610270023">
+<link rel="stylesheet" href="../kit/kit.css?v=202611090805">
 <script>try { var u = localStorage.getItem("beauty.ui"); if (u) document.documentElement.dataset.ui = u; } catch (e) {}</script>
 <style>
   /* Страница записи глазами клиента: шаги сверху вниз — услуга, день, время, контакты. */
@@ -133,9 +133,9 @@
   </div>
 </div>
 
-<script src="../kit/backgrounds.js?v=202610270023"></script>
-<script src="../kit/trends.js?v=202610270023"></script>
-<script src="../kit/kit.js?v=202610270023"></script>
+<script src="../kit/backgrounds.js?v=202611090805"></script>
+<script src="../kit/trends.js?v=202611090805"></script>
+<script src="../kit/kit.js?v=202611090805"></script>
 <script>
 // Демо: окошки берутся из раздела «Свободные окошки», услуги и цены — из «Прайс-листа» этого браузера.
 // Запись никуда не отправляется и не сохраняется.
@@ -211,7 +211,7 @@ const total = () => {
 
 // ---------- шаги ----------
 const sel = { svcs: [], day: null, time: null, mode: Kit.store.get("booking.mode") === "date" ? "date" : "svc" };
-const ORDER = { svc: ["s1", "s2", "s3", "s4"], date: ["sCal", "s1", "s3", "s4"] };   // «по услугам» и «по дате»
+const ORDER = { svc: ["s1", "sCal", "s3", "s4"], date: ["sCal", "s1", "s3", "s4"] };   // «по услугам» и «по дате»
 const MON_NOM = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
 let calMonth = (Object.keys(WIN).sort()[0] || today).slice(0, 7);
 function applyMode() {
@@ -229,19 +229,20 @@ function reset() {
     $("dayHint").textContent = ""; $("timeHint").textContent = "Выберите дату и услугу.";
     $("svcHint").textContent = "Сначала выберите дату — покажем услуги, которые в неё помещаются.";
   } else {
-    step("s1", true); step("s2", false); step("s3", false); step("s4", false);
+    step("s1", true); step("sCal", false); step("s3", false); step("s4", false);
     $("dayHint").textContent = "Сначала выберите услугу."; $("timeHint").textContent = "Выберите день."; $("svcHint").textContent = "";
   }
 }
 function buildCalendar() {                                      // месяц: даты со свободным временем — выделены
   const [y, m] = calMonth.split("-").map(Number), first = (new Date(y, m - 1, 1).getDay() + 6) % 7, n = new Date(y, m, 0).getDate();
-  const months = Object.keys(WIN).sort().map(d => d.slice(0, 7));
+  const maxDate = new Date(); maxDate.setMonth(maxDate.getMonth() + 11);
+  const maxMonth = `${maxDate.getFullYear()}-${pad(maxDate.getMonth() + 1)}`;
   $("calTitle").textContent = MON_NOM[m - 1] + (y !== new Date().getFullYear() ? " " + y : "");
   $("calPrev").disabled = calMonth <= today.slice(0, 7);
-  $("calNext").disabled = !months.length || calMonth >= months[months.length - 1];
+  $("calNext").disabled = calMonth >= maxMonth;
   let html = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map(d => `<span class="wd">${d}</span>`).join("") + "<span></span>".repeat(first);
   for (let d = 1; d <= n; d++) {
-    const iso = `${calMonth}-${pad(d)}`, free = !!WIN[iso] && iso >= today;
+    const iso = `${calMonth}-${pad(d)}`, need = sel.mode === "svc" ? total().dur : 0, free = !!WIN[iso] && iso >= today && (!need || startsFor(iso, need).length > 0);
     const hours = free ? WIN[iso].reduce((a, [s2, e]) => a + e - s2, 0) / 60 : 0;
     html += `<button type="button" class="cal-day${free ? " free" : ""}" data-iso="${iso}" ${free ? "" : "disabled"} aria-pressed="${sel.day === iso}" aria-label="${d} ${MON[m - 1]}${free ? ", свободно " + hours + " ч" : ""}">${d}${free ? `<small>${hours} ч</small>` : ""}</button>`;
   }
@@ -267,7 +268,7 @@ function buildServices() {
   const t = total();
   $("svcTotal").hidden = !t.n;
   $("svcSum").innerHTML = t.n ? `${t.n > 1 ? `${t.n} услуги · ` : ""}≈ ${durText(t.dur)}${t.price ? ` · <b>${esc(money(String(t.price)))}</b>` : ""}` : "";
-  $("svcNext").textContent = sel.mode === "date" ? "Выбрать время" : "Выбрать день";
+  $("svcNext").textContent = sel.mode === "date" ? "Выбрать время" : "Выбрать дату";
 }
 function buildDays() {
   const t = total(), days = Object.keys(WIN).sort();
@@ -294,13 +295,13 @@ $("svcs").addEventListener("click", e => {                     // выбирае
   sel.svcs = sel.svcs.includes(i) ? sel.svcs.filter(j => j !== i) : [...sel.svcs, i];
   sel.time = null; if (sel.mode === "svc") sel.day = null;
   buildServices(); $("times").innerHTML = ""; $("days").innerHTML = "";
-  step("s2", false); step("s3", false); step("s4", false);
+  step("sCal", false); step("s3", false); step("s4", false);
 });
 $("svcNext").addEventListener("click", () => {
   if (!sel.svcs.length) return;
   if (sel.mode === "date") { buildTimes(); step("s3", true); $("s3").scrollIntoView({ behavior: "smooth", block: "nearest" }); return; }
-  buildDays(); $("timeHint").textContent = "Выберите день."; step("s2", true);
-  $("s2").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  buildCalendar(); $("calHint").textContent = "Даты, когда выбранные услуги помещаются в свободное время."; step("sCal", true);
+  $("sCal").scrollIntoView({ behavior: "smooth", block: "nearest" });
 });
 $("days").addEventListener("click", e => {
   const b = e.target.closest(".day-btn"); if (!b || b.disabled) return;
@@ -316,6 +317,12 @@ $("times").addEventListener("click", e => {
 });
 $("cal").addEventListener("click", e => {
   const b = e.target.closest(".cal-day"); if (!b || b.disabled) return;
+  if (sel.mode === "svc") {
+    sel.day = b.dataset.iso; sel.time = null;
+    buildCalendar(); buildTimes(); step("s3", true); step("s4", false);
+    $("s3").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    return;
+  }
   sel.day = b.dataset.iso; sel.svcs = []; sel.time = null;
   const d = fromIso(sel.day);
   buildCalendar(); buildServices(); $("times").innerHTML = ""; $("timeHint").textContent = "Выберите услугу.";
