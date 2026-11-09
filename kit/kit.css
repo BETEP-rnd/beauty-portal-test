@@ -1,41 +1,41 @@
 /* Общие стили разделов: форма с вкладками слева, живое превью картинки справа; на телефоне превью сверху. */
 :root {
-  --bg: #f7f3ee; --panel: #ffffff; --line: #cdbcaa; --field: #fffdfa;
-  --text: #2b2420; --muted: #8a7b6e; --accent: #9b6b4f; --accent-ink: #ffffff; --bad: #b8483a; --ok: #4f7f45; --warn: #b7791f;
-  --free: #9b6b4f; --busy: #efe7dd;
-  --ui: "Montserrat", "Segoe UI", system-ui, sans-serif;
+  --bg: #f8f2ec; --panel: #fffaf6; --line: #d9c3b8; --field: #fffdfa;
+  --text: #2b1a1a; --muted: #7d6a63; --accent: #6e1f2e; --accent-ink: #ffffff; --bad: #b8483a; --ok: #4f7f45; --warn: #b7791f;
+  --free: #6e1f2e; --busy: #efe2dc; --gold: #b98a5e;
+  --ui: "Manrope", "Segoe UI", system-ui, sans-serif;
   --display: "Cormorant Garamond", "Times New Roman", serif;
   color-scheme: light;
 }
 /* оформление: светлая (по умолчанию днём), тёмная, комбинированная — тёмный фон и шапка, светлые панели */
 @media (prefers-color-scheme: dark) {
   :root:not([data-ui]) {
-    --bg: #16120f; --panel: #1f1a16; --line: #5a4b40; --field: #1a1613;
-    --text: #eee5da; --muted: #a8988a; --accent: #d2a37f; --accent-ink: #1a120c; --bad: #e08a6a; --ok: #8fbf7a; --warn: #e2b45a;
-    --free: #d2a37f; --busy: #2c251f;
+    --bg: #160d11; --panel: #22151a; --line: #4a3038; --field: #1a1014;
+    --text: #f5e9e4; --muted: #b9a39b; --accent: #d27b8b; --accent-ink: #1a0d11; --bad: #e08a6a; --ok: #8fbf7a; --warn: #e2b45a;
+    --free: #d27b8b; --busy: #2c1d23; --gold: #d9b07a;
     color-scheme: dark;
   }
 }
 :root[data-ui="dark"] {
-  --bg: #16120f; --panel: #1f1a16; --line: #5a4b40; --field: #1a1613;
-  --text: #eee5da; --muted: #a8988a; --accent: #d2a37f; --accent-ink: #1a120c; --bad: #e08a6a; --ok: #8fbf7a; --warn: #e2b45a;
-  --free: #d2a37f; --busy: #2c251f;
+  --bg: #160d11; --panel: #22151a; --line: #4a3038; --field: #1a1014;
+  --text: #f5e9e4; --muted: #b9a39b; --accent: #d27b8b; --accent-ink: #1a0d11; --bad: #e08a6a; --ok: #8fbf7a; --warn: #e2b45a;
+  --free: #d27b8b; --busy: #2c1d23; --gold: #d9b07a;
   color-scheme: dark;
 }
-:root[data-ui="mix"] { --page-bg: #15110e; --page-text: #f1e8dc; --page-muted: #bfae95; --page-line: #5c4c40; }
+:root[data-ui="mix"] { --page-bg: #1a0f13; --page-text: #f5e9e4; --page-muted: #b9a39b; --page-line: #4a3038; --gold: #d9b07a; }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { margin: 0; }
 body {
   background-color: var(--page-bg, var(--bg));
-  background-image: url("herbs-light.svg?v=202611091500");
+  background-image: url("herbs-light.svg?v=202611092000");
   background-repeat: repeat;
   background-size: 190px 190px;
   color: var(--page-text, var(--text)); font-family: var(--ui); font-size: 15px;
   padding: calc(22px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(40px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
 }
-@media (prefers-color-scheme: dark) { :root:not([data-ui]) body { background-image: url("herbs-dark.svg?v=202611091500"); } }
-:root[data-ui="dark"] body, :root[data-ui="mix"] body { background-image: url("herbs-dark.svg?v=202611091500"); }
+@media (prefers-color-scheme: dark) { :root:not([data-ui]) body { background-image: url("herbs-dark.svg?v=202611092000"); } }
+:root[data-ui="dark"] body, :root[data-ui="mix"] body { background-image: url("herbs-dark.svg?v=202611092000"); }
 .wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
 header.top { display: flex; align-items: baseline; gap: 14px 22px; flex-wrap: wrap; }
 header.top h1 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 40px; line-height: 1; }
