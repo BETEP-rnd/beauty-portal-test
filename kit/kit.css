@@ -3,6 +3,10 @@
   --bg: #f8f2ec; --panel: #fffaf6; --line: #d9c3b8; --field: #fffdfa;
   --text: #2b1a1a; --muted: #7d6a63; --accent: #6e1f2e; --accent-ink: #ffffff; --bad: #b8483a; --ok: #4f7f45; --warn: #b7791f;
   --free: #6e1f2e; --busy: #efe2dc; --gold: #b98a5e;
+  --wash-a: color-mix(in srgb, #6e1f2e 16%, transparent);
+  --wash-b: color-mix(in srgb, #b98a5e 14%, transparent);
+  --wash-c: color-mix(in srgb, #6e1f2e 10%, transparent);
+  --wash-d: color-mix(in srgb, #b98a5e 7%, transparent);
   --ui: "Manrope", "Segoe UI", system-ui, sans-serif;
   --display: "Cormorant Garamond", "Times New Roman", serif;
   color-scheme: light;
@@ -13,6 +17,10 @@
     --bg: #160d11; --panel: #22151a; --line: #4a3038; --field: #1a1014;
     --text: #f5e9e4; --muted: #b9a39b; --accent: #d27b8b; --accent-ink: #1a0d11; --bad: #e08a6a; --ok: #8fbf7a; --warn: #e2b45a;
     --free: #d27b8b; --busy: #2c1d23; --gold: #d9b07a;
+    --wash-a: color-mix(in srgb, #d27b8b 20%, transparent);
+    --wash-b: color-mix(in srgb, #d9b07a 15%, transparent);
+    --wash-c: color-mix(in srgb, #6e1f2e 32%, transparent);
+    --wash-d: color-mix(in srgb, #d9b07a 6%, transparent);
     color-scheme: dark;
   }
 }
@@ -20,22 +28,30 @@
   --bg: #160d11; --panel: #22151a; --line: #4a3038; --field: #1a1014;
   --text: #f5e9e4; --muted: #b9a39b; --accent: #d27b8b; --accent-ink: #1a0d11; --bad: #e08a6a; --ok: #8fbf7a; --warn: #e2b45a;
   --free: #d27b8b; --busy: #2c1d23; --gold: #d9b07a;
+  --wash-a: color-mix(in srgb, #d27b8b 20%, transparent);
+  --wash-b: color-mix(in srgb, #d9b07a 15%, transparent);
+  --wash-c: color-mix(in srgb, #6e1f2e 32%, transparent);
+  --wash-d: color-mix(in srgb, #d9b07a 6%, transparent);
   color-scheme: dark;
 }
-:root[data-ui="mix"] { --page-bg: #1a0f13; --page-text: #f5e9e4; --page-muted: #b9a39b; --page-line: #4a3038; --gold: #d9b07a; }
+:root[data-ui="mix"] { --page-bg: #1a0f13; --page-text: #f5e9e4; --page-muted: #b9a39b; --page-line: #4a3038; --gold: #d9b07a; --accent: #d27b8b; --accent-ink: #1a0d11; --wash-a: color-mix(in srgb, #d27b8b 20%, transparent); --wash-b: color-mix(in srgb, #d9b07a 15%, transparent); --wash-c: color-mix(in srgb, #6e1f2e 32%, transparent); --wash-d: color-mix(in srgb, #d9b07a 6%, transparent); }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { margin: 0; }
 body {
   background-color: var(--page-bg, var(--bg));
-  background-image: url("herbs-light.svg?v=202611092200");
-  background-repeat: repeat;
-  background-size: 320px 320px;
+  background-image:
+    url("grain.svg?v=202611092400"),
+    radial-gradient(circle at 12% 8%, var(--wash-a), transparent 44%),
+    radial-gradient(circle at 88% 16%, var(--wash-b), transparent 42%),
+    radial-gradient(circle at 72% 88%, var(--wash-c), transparent 48%),
+    linear-gradient(114deg, transparent 16%, var(--wash-d) 48%, transparent 80%);
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+  background-size: 160px 160px, cover, cover, cover, cover;
   color: var(--page-text, var(--text)); font-family: var(--ui); font-size: 15px;
   padding: calc(22px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(40px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
 }
-@media (prefers-color-scheme: dark) { :root:not([data-ui]) body { background-image: url("herbs-dark.svg?v=202611092200"); } }
-:root[data-ui="dark"] body, :root[data-ui="mix"] body { background-image: url("herbs-dark.svg?v=202611092200"); }
+/* фон задают общие градиенты и зерно, отдельные картинки для тёмной темы не нужны */
 .wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
 header.top { display: flex; align-items: baseline; gap: 14px 22px; flex-wrap: wrap; }
 header.top h1 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 40px; line-height: 1; }
