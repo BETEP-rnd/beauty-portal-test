@@ -3,7 +3,7 @@
   --bg: #f8f2ec; --panel: #fffaf6; --line: color-mix(in srgb, #d9c3b8 74%, #000); --field: #fffdfa;
   --text: #2b1a1a; --muted: #7d6a63; --accent: #6e1f2e; --accent-ink: #ffffff; --bad: #b8483a; --ok: #4f7f45; --warn: #b7791f;
   --free: #6e1f2e; --busy: #efe2dc; --gold: #b98a5e;
-  --paper-veil: rgba(248, 242, 236, 0.52);
+  --paper-veil: rgba(248, 242, 236, 0.36);
   --wash-a: color-mix(in srgb, #6e1f2e 16%, transparent);
   --wash-b: color-mix(in srgb, #b98a5e 14%, transparent);
   --wash-c: color-mix(in srgb, #6e1f2e 10%, transparent);
@@ -18,7 +18,7 @@
     --bg: #160d11; --panel: #22151a; --line: color-mix(in srgb, #4a3038 74%, #000); --field: #1a1014;
     --text: #f5e9e4; --muted: #b9a39b; --accent: #d27b8b; --accent-ink: #1a0d11; --bad: #e08a6a; --ok: #8fbf7a; --warn: #e2b45a;
     --free: #d27b8b; --busy: #2c1d23; --gold: #d9b07a;
-    --paper-veil: rgba(22, 13, 17, 0.86);
+    --paper-veil: rgba(22, 13, 17, 0.82);
     --wash-a: color-mix(in srgb, #d27b8b 20%, transparent);
     --wash-b: color-mix(in srgb, #d9b07a 15%, transparent);
     --wash-c: color-mix(in srgb, #6e1f2e 32%, transparent);
@@ -30,14 +30,14 @@
   --bg: #160d11; --panel: #22151a; --line: color-mix(in srgb, #4a3038 74%, #000); --field: #1a1014;
   --text: #f5e9e4; --muted: #b9a39b; --accent: #d27b8b; --accent-ink: #1a0d11; --bad: #e08a6a; --ok: #8fbf7a; --warn: #e2b45a;
   --free: #d27b8b; --busy: #2c1d23; --gold: #d9b07a;
-  --paper-veil: rgba(22, 13, 17, 0.86);
+  --paper-veil: rgba(22, 13, 17, 0.82);
   --wash-a: color-mix(in srgb, #d27b8b 20%, transparent);
   --wash-b: color-mix(in srgb, #d9b07a 15%, transparent);
   --wash-c: color-mix(in srgb, #6e1f2e 32%, transparent);
   --wash-d: color-mix(in srgb, #d9b07a 6%, transparent);
   color-scheme: dark;
 }
-:root[data-ui="mix"] { --page-bg: #1a0f13; --page-text: #f5e9e4; --page-muted: #b9a39b; --page-line: color-mix(in srgb, #4a3038 74%, #000); --gold: #d9b07a; --accent: #d27b8b; --accent-ink: #1a0d11; --wash-a: color-mix(in srgb, #d27b8b 20%, transparent); --wash-b: color-mix(in srgb, #d9b07a 15%, transparent); --wash-c: color-mix(in srgb, #6e1f2e 32%, transparent); --wash-d: color-mix(in srgb, #d9b07a 6%, transparent); --paper-veil: rgba(26, 15, 19, 0.88); }
+:root[data-ui="mix"] { --page-bg: #1a0f13; --page-text: #f5e9e4; --page-muted: #b9a39b; --page-line: color-mix(in srgb, #4a3038 74%, #000); --gold: #d9b07a; --accent: #d27b8b; --accent-ink: #1a0d11; --wash-a: color-mix(in srgb, #d27b8b 20%, transparent); --wash-b: color-mix(in srgb, #d9b07a 15%, transparent); --wash-c: color-mix(in srgb, #6e1f2e 32%, transparent); --wash-d: color-mix(in srgb, #d9b07a 6%, transparent); --paper-veil: rgba(26, 15, 19, 0.82); }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { margin: 0; }
@@ -60,9 +60,9 @@ body::before {
     radial-gradient(circle at 72% 88%, var(--wash-c), transparent 48%),
     linear-gradient(114deg, transparent 16%, var(--wash-d) 48%, transparent 80%),
     linear-gradient(var(--paper-veil), var(--paper-veil)),
-    url("paper-botanical-half.jpg?v=202611102107");
-  background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
-  background-size: 160px 160px, cover, cover, cover, cover, cover, cover;
+    url("paper-leaves.png?v=202611102156");
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat;
+  background-size: 160px 160px, cover, cover, cover, cover, cover, 512px 512px;
   background-position: center;
 }
 /* фон: общая ботаническая текстура, градиенты и зерно; тёмная тема приглушает её вуалью */
