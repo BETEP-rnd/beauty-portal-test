@@ -333,7 +333,10 @@ Object.entries(forms).forEach(([mode, form]) => form.addEventListener("submit", 
       form.querySelectorAll('input[type="password"]').forEach(input => { input.value = ""; });
       if (mode === "login" && loginMethod === "phone") form.elements.code.value = "";
       document.getElementById("logout").hidden = false;
+      status.className = "status ok";
       status.textContent = mode === "register" ? "Аккаунт создан, вход выполнен." : "Вход выполнен.";
+      location.replace("../cabinet/");
+      return;
     }
     status.className = "status ok";
   } catch (error) {
