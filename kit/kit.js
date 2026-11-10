@@ -93,13 +93,17 @@
     return {};
   }
 
+  function bookingUrl() {
+    try { return new URL("../booking/", location.href).href; } catch (error) { return ""; }
+  }
+
   // ---------- профиль мастера: один на все разделы ----------
   const PROFILE_KEY = "beauty.profile";
   const API_URL = "https://api.masterfolio.ru";
   // нейтральный шаблон; персональные данные заказчицы из кода убраны
   const PRESET = { master: "", phone: "", email: "", showEmail: false,
     soc: { wa: { on: false, val: "", logo: false }, tg: { on: false, val: "", logo: false }, ig: { on: false, val: "", logo: false }, max: { on: false, val: "", logo: false } },
-    socLayout: "row", qr: "none", qrUrl: "" };
+    socLayout: "row", qr: "none", qrUrl: "", qrSocial: "none", qrBooking: false };
   const LEGACY_PRESET_FINGERPRINT = "7710991b";
   function profileFingerprint(master, phone) {
     const value = String(master || "") + "|" + String(phone || "");
@@ -109,15 +113,16 @@
   }
   function loadProfile() {
     const p = { master: "", phone: "", email: "", showEmail: false, soc: { wa: { on: false, val: "", logo: false }, tg: { on: false, val: "", logo: false }, ig: { on: false, val: "", logo: false }, max: { on: false, val: "", logo: false } },
-      socLayout: "row", qr: "none", qrUrl: "" };
+      socLayout: "row", qr: "none", qrUrl: "", qrSocial: "none", qrBooking: false };
     let saved = loadJSON(PROFILE_KEY) || loadJSON("price.v1");     // прайс до появления профиля хранил контакты у себя
     if (!saved) saved = {};
-    ["master", "phone", "email", "socLayout", "qr", "qrUrl"].forEach(k => { if (typeof saved[k] === "string") p[k] = saved[k]; });
+    ["master", "phone", "email", "socLayout", "qr", "qrUrl", "qrSocial"].forEach(k => { if (typeof saved[k] === "string") p[k] = saved[k]; });
     p.showEmail = !!saved.showEmail;
     p.hideBusy = !!saved.hideBusy;                              // «Свободные окошки»: не показывать дни без окошек
     p.qrBare = !!saved.qrBare;                                  // QR без светлой плашки
     if (saved.soc) SOCIALS.forEach(({ k }) => { if (saved.soc[k]) p.soc[k] = { on: !!saved.soc[k].on, val: saved.soc[k].val || "", logo: !!saved.soc[k].logo }; });
     p.phone = maskPhone(p.phone);
+    p.qrBooking = !!saved.qrBooking;
     return p;
   }
   const saveProfile = p => store.set(PROFILE_KEY, JSON.stringify(p));
@@ -237,7 +242,10 @@
     const phone = { icon: "phone", text: fmtPhone(prof.phone) || "+7 (999) 999-99-99", size: phoneSize, weight: st.weight, color: prof.phone ? st.color : t.muted };
     const socs = SOCIALS.filter(s => prof.soc[s.k].on).map(s => ({ icon: s.k, text: prof.soc[s.k].logo ? "" : socText(prof, s.k), size: socSize, weight: socWeight, color: st.color }));
     if (prof.showEmail && (prof.email || "").trim()) socs.push({ icon: "mail", text: prof.email.trim(), size: socSize, weight: socWeight, color: st.color });
-    const qr = qrTarget(prof), qs = F.qr, capH = 46, colW = qr.url ? W - 2 * P - qs - 44 : W - 2 * P;
+    const qr = qrTarget(prof), book = prof.qrBooking ? bookingUrl() : "", qs = F.qr, capH = 46;
+    const leftQr = qr.url ? qr : null;
+    const rightQr = book ? { url: book, cap: "Онлайн-запись" } : null;
+    const colLeft = P + (leftQr ? qs + 44 : 0), colRight = W - P - (rightQr ? qs + 44 : 0), colW = Math.max(0, colRight - colLeft);
     const LOGO = 1.6;                                           // значок без подписи («только логотип») — крупнее, чтобы читался
     const itemW = it => { if (!it.text) return it.size * LOGO; ctx.font = fontOf(st, it.size, it.weight); return it.size * 1.3 + ctx.measureText(caseOf(st, it.text)).width; };
     const lines = [[phone]];                                    // строки подвала: телефон, потом соцсети
@@ -252,13 +260,13 @@
       if (cur.length) lines.push(cur);
     }
     const lh = l => l[0].size * 1.65, textH = lines.reduce((a, l) => a + lh(l), 0) - lines[lines.length - 1][0].size * .65;
-    const h = Math.max(textH, qr.url ? qs + capH : 0);
+    const h = Math.max(textH, (leftQr || rightQr) ? qs + capH : 0);
     return { h, draw(top) {
       let y = top + (h - textH) / 2;
       lines.forEach(line => {
         const base = y + line[0].size;
         const total = line.reduce((a, it) => a + itemW(it), 0) + 34 * (line.length - 1), k = total > colW ? colW / total : 1;
-        let x = qr.url ? P : W / 2 - total * k / 2;
+        let x = colLeft + (colW - total * k) / 2;
         line.forEach(it => {
           const size = it.size * k, text = caseOf(st, it.text);
           if (!text) { const lw = size * LOGO; dr.icon(it.icon, x, base - size * .82 - (lw - size * .9) / 2, lw, iconCol(it.color)); x += lw + 34 * k; return; }
@@ -270,10 +278,15 @@
         });
         y += lh(line);
       });
-      if (qr.url) {
-        const qx = W - P - qs, qy = top + (h - qs - capH) / 2;
-        dr.drawQr(qr.url, qx, qy, qs, t, prof.qrBare);
-        dr.centered(qr.cap, qx + qs / 2, qy + qs + 36, '500 24px "Montserrat"', t.muted, qs + 40);
+      const qy = top + (h - qs - capH) / 2;
+      if (leftQr) {
+        dr.drawQr(leftQr.url, P, qy, qs, t, prof.qrBare);
+        dr.centered(leftQr.cap, P + qs / 2, qy + qs + 36, '500 24px "Montserrat"', t.muted, qs + 40);
+      }
+      if (rightQr) {
+        const qx = W - P - qs;
+        dr.drawQr(rightQr.url, qx, qy, qs, t, prof.qrBare);
+        dr.centered(rightQr.cap, qx + qs / 2, qy + qs + 36, '500 24px "Montserrat"', t.muted, qs + 40);
       }
     } };
   }
@@ -443,7 +456,7 @@
   const SHOW = [...SOCIALS, { k: "email", name: "Почта" }];
   // выбор раздела «что показать на картинке»; по умолчанию — всё, что заполнено в кабинете
   function defaultShow(prof) {
-    const sel = { layout: prof.socLayout || "row", qr: prof.qr || "none", qrUrl: prof.qrUrl || "" };
+    const sel = { layout: prof.socLayout || "row", qr: prof.qrSocial || "none", qrUrl: "" };
     SHOW.forEach(({ k }) => sel[k] = k === "email" ? !!prof.showEmail && avail(prof, k) : avail(prof, k));
     return sel;
   }
@@ -496,12 +509,24 @@
         <label class="check logo"><input type="checkbox" data-logo="max" aria-label="MAX — только логотип"><span>только логотип</span></label></div>
       <div class="field"><span class="lbl">Соцсети на картинках</span>
         <div class="seg" id="k-layout"><button type="button" data-k="row">В строку</button><button type="button" data-k="col">Столбиком</button></div></div>
-      <label class="check"><input type="checkbox" id="k-qrBare"> QR-код с прозрачным фоном</label>
+      <div class="field"><label for="k-qrSocial">QR-соцсеть на картинках</label>
+        <select id="k-qrSocial"></select>
+        <span class="hint">QR выбранной соцсети будет слева на всех картинках.</span></div>
+      <label class="check"><input type="checkbox" id="k-qrBare"> QR-коды с прозрачным фоном</label>
+      <label class="check"><input type="checkbox" id="k-qrBooking"> Отображать QR-код на Онлайн запись</label>
       <span class="lbl">Свободные окошки</span>
       <label class="check"><input type="checkbox" id="k-hideBusy"> Не показывать дни без окошек</label>
     </section>`;
     const $i = id => root.querySelector("#k-" + id), deleting = e => (e.inputType || "").startsWith("delete");
-    const changed = () => { saveProfile(prof); onChange("profile"); };
+    const qrSocialSelect = $i("qrSocial");
+    function refreshQrSocial() {
+      const current = prof.qrSocial || "none";
+      qrSocialSelect.innerHTML = '<option value="none">Без QR-соцсети</option>' +
+        SOCIALS.filter(({ k }) => avail(prof, k)).map(({ k, name }) => `<option value="${k}">${name}</option>`).join("");
+      qrSocialSelect.value = [...qrSocialSelect.options].some(o => o.value === current) ? current : "none";
+      if (qrSocialSelect.value !== current) prof.qrSocial = qrSocialSelect.value;
+    }
+    const changed = () => { refreshQrSocial(); saveProfile(prof); onChange("profile"); };
     prof.phone = maskPhone(prof.phone || "");
     $i("master").value = prof.master; $i("phone").value = prof.phone; $i("email").value = prof.email;
     SOCIALS.forEach(({ k }) => {
@@ -522,6 +547,10 @@
     $i("layout").addEventListener("click", e => { const b = e.target.closest("[data-k]"); if (!b) return; prof.socLayout = b.dataset.k; press($i("layout"), prof.socLayout); changed(); });
     $i("qrBare").checked = prof.qrBare;
     $i("qrBare").addEventListener("change", e => { prof.qrBare = e.target.checked; changed(); });
+    refreshQrSocial();
+    $i("qrSocial").addEventListener("change", e => { prof.qrSocial = e.target.value; changed(); });
+    $i("qrBooking").checked = prof.qrBooking;
+    $i("qrBooking").addEventListener("change", e => { prof.qrBooking = e.target.checked; changed(); });
     $i("hideBusy").checked = prof.hideBusy;
     $i("hideBusy").addEventListener("change", e => { prof.hideBusy = e.target.checked; changed(); });
     root.addEventListener("input", e => {                       // вписали значение — соцсеть включается сама; галкой можно скрыть, не стирая
