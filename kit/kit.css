@@ -60,7 +60,7 @@ body::before {
     radial-gradient(circle at 72% 88%, var(--wash-c), transparent 48%),
     linear-gradient(114deg, transparent 16%, var(--wash-d) 48%, transparent 80%),
     linear-gradient(var(--paper-veil), var(--paper-veil)),
-    url("paper-botanical.jpg?v=202611102100");
+    url("paper-botanical-half.jpg?v=202611102107");
   background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
   background-size: 160px 160px, cover, cover, cover, cover, cover, cover;
   background-position: center;
