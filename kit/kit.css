@@ -268,5 +268,5 @@ header.top nav { grid-area: nav; }
   .uiswitch button { font-size: 11px; }
 }
 
-/* липкая шапка: подложка в цвет темы, чтобы контент не просвечивал при прокрутке */
-header.top { background: var(--page-bg, var(--bg)); background: color-mix(in srgb, var(--page-bg, var(--bg)) 86%, transparent); -webkit-backdrop-filter: blur(14px) saturate(1.05); backdrop-filter: blur(14px) saturate(1.05); }
+/* прозрачная шапка: виден фон страницы */
+header.top { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
