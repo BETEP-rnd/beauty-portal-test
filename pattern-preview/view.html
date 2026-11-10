@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Кабинет с паттерном — Мастерфолио</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --bg: #160d11;
+    --text: #f5e9e4;
+    --muted: #b9a39b;
+    --gold: #d9b07a;
+    --accent: #d27b8b;
+    --line: color-mix(in srgb, #4a3038 74%, #000);
+    --ui: "Manrope", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); overflow: hidden; }
+  iframe { display: block; width: 100%; height: 100vh; height: 100dvh; border: 0; background: #f8f2ec; }
+  .bar {
+    position: fixed;
+    left: 50%;
+    bottom: max(12px, env(safe-area-inset-bottom, 0px));
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: calc(100vw - 24px);
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(22, 13, 17, .92);
+    color: var(--text);
+    font-family: var(--ui);
+    font-size: 12px;
+    box-shadow: 0 12px 34px rgba(0, 0, 0, .38);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    transform: translateX(-50%);
+  }
+  .bar a { color: var(--muted); text-decoration: none; padding: 4px 6px; border-radius: 6px; white-space: nowrap; }
+  .bar a:hover, .bar a:focus-visible { color: var(--accent); outline: none; }
+  .bar .name { color: var(--gold); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 44vw; }
+  .bar .sep { width: 1px; height: 16px; background: var(--line); flex: none; }
+  .bar .arrow { font-size: 17px; line-height: 1; }
+  @media (max-width: 520px) {
+    .bar { gap: 6px; padding: 7px 10px; font-size: 11px; }
+    .bar .name { max-width: 34vw; }
+  }
+</style>
+</head>
+<body>
+<iframe id="cabinet" title="Страница личного кабинета с выбранным паттерном"></iframe>
+<nav class="bar" aria-label="Переключение фонов">
+  <a href="./">Все фоны</a>
+  <span class="sep" aria-hidden="true"></span>
+  <a class="arrow" id="prev" href="view.html?p=p1" aria-label="Предыдущий фон">‹</a>
+  <span class="name" id="name">Фон</span>
+  <a class="arrow" id="next" href="view.html?p=p2" aria-label="Следующий фон">›</a>
+</nav>
+<script>
+  const PATTERNS = {
+    p1: { name: "Тёплые листья", file: "p1.png", size: "512px 512px", repeat: "repeat" },
+    p2: { name: "Серо-бежевый сад", file: "p2.png", size: "512px 512px", repeat: "repeat" },
+    p3: { name: "Воздушные ветки", file: "p3.png", size: "512px 512px", repeat: "repeat" },
+    p4: { name: "Бежевая акварель", file: "p4.png", size: "512px 512px", repeat: "repeat" },
+    p5: { name: "Шалфей на кремовом", file: "p5.png", size: "cover", repeat: "no-repeat" },
+    p6: { name: "Розово-серые листья", file: "p6.png", size: "512px 512px", repeat: "repeat" }
+  };
+  const keys = Object.keys(PATTERNS);
+  const params = new URLSearchParams(location.search);
+  const requested = params.get("p");
+  const key = PATTERNS[requested] ? requested : "p1";
+  const item = PATTERNS[key];
+  const idx = keys.indexOf(key);
+  const prev = keys[(idx + keys.length - 1) % keys.length];
+  const next = keys[(idx + 1) % keys.length];
+  const patternUrl = new URL("patterns/" + item.file, location.href).href;
+  const frame = document.getElementById("cabinet");
+  document.getElementById("name").textContent = item.name;
+  document.getElementById("prev").href = "view.html?p=" + prev;
+  document.getElementById("next").href = "view.html?p=" + next;
+  document.title = item.name + " — кабинет";
+  frame.src = "../cabinet/index.html";
+  frame.onload = () => {
+    try {
+      const doc = frame.contentDocument;
+      doc.documentElement.dataset.ui = "light";
+      const style = doc.createElement("style");
+      style.textContent = `
+        :root { --paper-veil: rgba(248, 242, 236, .30) !important; }
+        :root[data-ui="dark"] { --paper-veil: rgba(22, 13, 17, .82) !important; }
+        :root[data-ui="mix"] { --paper-veil: rgba(26, 15, 19, .82) !important; }
+        body::before {
+          background-image:
+            url("../kit/grain.svg?v=202611092400"),
+            radial-gradient(circle at 12% 8%, var(--wash-a), transparent 44%),
+            radial-gradient(circle at 88% 16%, var(--wash-b), transparent 42%),
+            radial-gradient(circle at 72% 88%, var(--wash-c), transparent 48%),
+            linear-gradient(114deg, transparent 16%, var(--wash-d) 48%, transparent 80%),
+            linear-gradient(var(--paper-veil), var(--paper-veil)),
+            url("${patternUrl}") !important;
+          background-size: 160px 160px, cover, cover, cover, cover, cover, ${item.size} !important;
+          background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, ${item.repeat} !important;
+          background-position: center !important;
+        }
+      `;
+      doc.head.appendChild(style);
+    } catch (error) {}
+  };
+</script>
+</body>
+</html>
