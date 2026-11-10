@@ -502,8 +502,14 @@
     </section>`;
     const $i = id => root.querySelector("#k-" + id), deleting = e => (e.inputType || "").startsWith("delete");
     const changed = () => { saveProfile(prof); onChange("profile"); };
+    prof.phone = maskPhone(prof.phone || "");
     $i("master").value = prof.master; $i("phone").value = prof.phone; $i("email").value = prof.email;
-    SOCIALS.forEach(({ k }) => { $i(k + "-on").checked = prof.soc[k].on; $i("soc-" + k).value = prof.soc[k].val; root.querySelector(`[data-logo="${k}"]`).checked = !!prof.soc[k].logo; });
+    SOCIALS.forEach(({ k }) => {
+      if (k === "wa") prof.soc[k].val = maskPhone(prof.soc[k].val || "");
+      $i(k + "-on").checked = prof.soc[k].on;
+      $i("soc-" + k).value = prof.soc[k].val;
+      root.querySelector(`[data-logo="${k}"]`).checked = !!prof.soc[k].logo;
+    });
     root.addEventListener("change", e => {
       const on = (e.target.id || "").match(/^k-(\w+)-on$/), k = e.target.dataset.logo;
       if (on) { prof.soc[on[1]].on = e.target.checked; changed(); }
@@ -697,7 +703,7 @@
           const changedAccount = (Boolean(accountId) && accountId !== String(master.id)) || (Boolean(owner) && owner !== String(master.id));
           if (changedAccount) {
             profile.master = master.name || "";
-            profile.phone = master.phone || "";
+            profile.phone = maskPhone(master.phone || "");
             profile.email = master.email || "";
             profile.showEmail = false;
             SOCIALS.forEach(({ k }) => { profile.soc[k] = { on: false, val: "", logo: false }; });
@@ -707,7 +713,7 @@
             return;
           }
           if (!accountId) {
-            const next = { master: master.name || profile.master || "", phone: master.phone || profile.phone || "", email: master.email || profile.email || "" };
+            const next = { master: master.name || profile.master || "", phone: maskPhone(master.phone || profile.phone || ""), email: master.email || profile.email || "" };
             if (profile.master !== next.master || profile.phone !== next.phone || profile.email !== next.email) {
               Object.assign(profile, next);
               saveProfile(profile);
