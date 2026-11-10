@@ -637,6 +637,7 @@
   }
 
   const ACCOUNT_KEY = "beauty.accountId";
+  const PROFILE_OWNER_KEY = "beauty.profileOwner";
   function updateAccountNav(loggedIn) {
     try {
       document.querySelectorAll("header.top nav").forEach(nav => {
@@ -668,7 +669,7 @@
     try { await fetch(API_URL + "/api/auth/logout", { method: "POST", credentials: "include" }); } catch (error) {}
     try {
       localStorage.removeItem(ACCOUNT_KEY);
-      localStorage.removeItem(PROFILE_KEY);
+      // настройки профиля остаются: соцсети, раскладка, QR и окошки не должны пропадать после выхода
     } catch (error) {}
     location.href = "../auth/";
   }
@@ -686,24 +687,36 @@
             return;
           }
           updateAccountNav(true);
-          if (accountId === String(master.id)) return;
-          const saved = loadJSON(PROFILE_KEY) || {};
+          if (accountId === String(master.id)) {
+            try { if (!localStorage.getItem(PROFILE_OWNER_KEY)) localStorage.setItem(PROFILE_OWNER_KEY, String(master.id)); } catch (error) {}
+            return;
+          }
           const profile = loadProfile();
-          const isPreset = profileFingerprint(saved.master, saved.phone) === LEGACY_PRESET_FINGERPRINT;
-          const empty = !(profile.master || "").trim() && !digits(profile.phone);
-          const changedAccount = Boolean(accountId) && accountId !== String(master.id);
-          if (changedAccount || (!accountId && (empty || isPreset))) {
+          let owner = null;
+          try { owner = localStorage.getItem(PROFILE_OWNER_KEY); } catch (error) {}
+          const changedAccount = (Boolean(accountId) && accountId !== String(master.id)) || (Boolean(owner) && owner !== String(master.id));
+          if (changedAccount) {
             profile.master = master.name || "";
             profile.phone = master.phone || "";
             profile.email = master.email || "";
             profile.showEmail = false;
             SOCIALS.forEach(({ k }) => { profile.soc[k] = { on: false, val: "", logo: false }; });
             saveProfile(profile);
-            try { localStorage.setItem(ACCOUNT_KEY, String(master.id)); } catch (error) {}
+            try { localStorage.setItem(ACCOUNT_KEY, String(master.id)); localStorage.setItem(PROFILE_OWNER_KEY, String(master.id)); } catch (error) {}
             location.reload();
             return;
           }
-          try { localStorage.setItem(ACCOUNT_KEY, String(master.id)); } catch (error) {}
+          if (!accountId) {
+            const next = { master: master.name || profile.master || "", phone: master.phone || profile.phone || "", email: master.email || profile.email || "" };
+            if (profile.master !== next.master || profile.phone !== next.phone || profile.email !== next.email) {
+              Object.assign(profile, next);
+              saveProfile(profile);
+              try { localStorage.setItem(ACCOUNT_KEY, String(master.id)); localStorage.setItem(PROFILE_OWNER_KEY, String(master.id)); } catch (error) {}
+              location.reload();
+              return;
+            }
+          }
+          try { localStorage.setItem(ACCOUNT_KEY, String(master.id)); localStorage.setItem(PROFILE_OWNER_KEY, String(master.id)); } catch (error) {}
         })
         .catch(() => {});
     } catch (error) {}
