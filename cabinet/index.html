@@ -32,6 +32,8 @@
   @media (min-width: 421px) { .me .socin { grid-template-columns: 128px minmax(0, 1fr) auto; } }
   .me .check input { width: 18px; height: 18px; }
   .me input[type="text"], .me input[type="tel"], .me input[type="url"], .me input[type="email"] { font-size: 17px; }
+  .cab { --line-strong: color-mix(in srgb, var(--line) 74%, #000); }
+  .hello, .card, .cab .me, .cab input, .cab select, .cab .seg, .cab .chip, .cab .icon { border-color: var(--line-strong); }
   @media (max-width: 520px) {
     .me label, .me .lbl, .me .check.logo, .me .hint, .me .linkbtn { font-size: 13.5px; }
     .me .check { font-size: 15px; }
