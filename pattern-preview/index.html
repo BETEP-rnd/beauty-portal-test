@@ -4,14 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Паттерны для кабинета</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;600;700&display=swap">
 <style>
   :root {
     --bg: #160d11;
-    --bg-soft: #1d1217;
     --surface: #22151a;
-    --line: #4a3038;
+    --line: color-mix(in srgb, #4a3038 74%, #000);
     --text: #f5e9e4;
     --muted: #b9a39b;
     --accent: #d27b8b;
@@ -36,135 +34,39 @@
     padding-right: max(20px, env(safe-area-inset-right, 0px));
   }
   .wrap { max-width: 1220px; margin: 0 auto; }
-  .masthead {
-    display: grid;
-    gap: 14px;
-    padding-bottom: 34px;
-    border-bottom: 1px solid var(--line);
-  }
-  .eyebrow {
-    margin: 0;
-    color: var(--gold);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: .22em;
-    text-transform: uppercase;
-  }
-  h1 {
-    margin: 0;
-    max-width: 900px;
-    font-family: var(--display);
-    font-size: clamp(44px, 6.2vw, 76px);
-    font-weight: 500;
-    line-height: .98;
-    letter-spacing: -.015em;
-    text-wrap: balance;
-  }
-  .lede {
-    margin: 0;
-    max-width: 720px;
-    color: var(--muted);
-    font-size: 15px;
-    line-height: 1.7;
-  }
-  .note {
-    margin: 0;
-    color: var(--muted);
-    font-size: 12px;
-    line-height: 1.6;
-    opacity: .8;
-  }
-  .pattern {
-    display: grid;
-    gap: 0;
-    padding: 34px 0 38px;
-    border-bottom: 1px solid var(--line);
-  }
-  .pattern:last-of-type { border-bottom: 0; }
-  .pattern-head {
-    display: grid;
-    grid-template-columns: 44px minmax(0, 1fr);
-    gap: 18px;
-    align-items: start;
-  }
-  .num {
-    padding-top: 4px;
-    color: var(--gold);
-    font-family: var(--display);
-    font-size: 24px;
-    font-style: italic;
-    line-height: 1;
-  }
-  h2 {
-    margin: 0 0 4px;
-    font-family: var(--display);
-    font-size: 32px;
-    font-weight: 600;
-    line-height: 1.05;
-    text-wrap: balance;
-  }
-  .desc {
-    margin: 0;
-    max-width: 680px;
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 1.6;
-  }
-  .shots {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 240px;
-    gap: 16px;
-    align-items: start;
-    margin-top: 18px;
-  }
-  .shot {
+  .masthead { display: grid; gap: 14px; padding-bottom: 30px; border-bottom: 1px solid var(--line); }
+  .eyebrow { margin: 0; color: var(--gold); font-size: 11px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; }
+  h1 { margin: 0; max-width: 900px; font-family: var(--display); font-size: clamp(44px, 6.2vw, 76px); font-weight: 500; line-height: .98; letter-spacing: -.015em; text-wrap: balance; }
+  .lede { margin: 0; max-width: 720px; color: var(--muted); font-size: 15px; line-height: 1.7; }
+  .note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; opacity: .8; }
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 30px 0 8px; }
+  .card {
     display: flex;
     flex-direction: column;
-    gap: 7px;
-    min-width: 0;
-    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+    color: inherit;
+    text-decoration: none;
+    overflow: hidden;
+    transition: border-color .2s ease, transform .2s ease;
   }
-  .shot img {
-    display: block;
-    width: 100%;
-    height: auto;
-    border: 1px solid rgba(245, 233, 228, .18);
-    border-radius: 10px;
-    background: #f8f2ec;
-    box-shadow: 0 18px 44px rgba(0, 0, 0, .38);
-  }
-  .shot figcaption {
-    color: var(--muted);
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: .16em;
-    text-transform: uppercase;
-  }
-  .shot.phone { max-width: 240px; }
-  footer {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-    padding-top: 26px;
-    color: var(--muted);
-    font-size: 11px;
-    letter-spacing: .06em;
-  }
+  .card:hover, .card:focus-visible { border-color: var(--accent); transform: translateY(-2px); outline: none; }
+  .swatch { height: 190px; background-position: center; background-repeat: repeat; background-size: 360px auto; }
+  .swatch.cover { background-size: cover; background-repeat: no-repeat; }
+  .body { display: flex; flex-direction: column; gap: 5px; padding: 16px 18px 18px; }
+  .num { color: var(--gold); font-family: var(--display); font-size: 18px; font-style: italic; line-height: 1; }
+  h2 { margin: 0; font-family: var(--display); font-size: 28px; font-weight: 600; line-height: 1.05; text-wrap: balance; }
+  .desc { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+  .open { margin-top: 8px; color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+  footer { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; letter-spacing: .06em; }
   footer span:last-child { color: var(--gold); }
-  @media (max-width: 760px) {
+  @media (max-width: 920px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 620px) {
     body { padding-block: 30px; }
-    .masthead { padding-bottom: 26px; }
     h1 { font-size: 46px; }
-    .pattern { padding: 28px 0 30px; }
-    .pattern-head { grid-template-columns: 34px minmax(0, 1fr); gap: 12px; }
-    h2 { font-size: 28px; }
-    .shots { grid-template-columns: minmax(0, 1fr); gap: 14px; }
-    .shot.phone { max-width: 240px; }
-  }
-  @media (max-width: 400px) {
-    h1 { font-size: 40px; }
-    .num { font-size: 21px; }
+    .grid { grid-template-columns: minmax(0, 1fr); gap: 14px; padding-top: 24px; }
+    .swatch { height: 180px; }
   }
 </style>
 </head>
@@ -173,130 +75,35 @@
   <header class="masthead">
     <p class="eyebrow">Мастерфолио · подбор фона</p>
     <h1>Паттерны для кабинета</h1>
-    <p class="lede">Шесть вариантов на реальной странице «Личный кабинет». Слева компьютер, справа телефон. Все превью в светлой теме, с лёгкой вуалью для читаемости.</p>
-    <p class="note">Квадратные паттерны повторяются плиткой 512 px, пятый вариант растянут по высоте.</p>
+    <p class="lede">Выбери фон и открой его на полной странице кабинета. Внизу каждой страницы можно переключать варианты стрелками.</p>
+    <p class="note">Паттерн показан в масштабе плитки 512 px, пятый вариант растянут по высоте.</p>
   </header>
 
-  <main>
-    <section class="pattern">
-      <div class="pattern-head">
-        <span class="num">01</span>
-        <div>
-          <h2>Тёплые листья</h2>
-          <p class="desc">Бежево-коричневые ветки на фактурном креме. Самый тёплый вариант.</p>
-        </div>
-      </div>
-      <div class="shots">
-        <figure class="shot desktop">
-          <img src="preview/p1-desktop.jpg" alt="Паттерн «Тёплые листья» на странице кабинета, вид с компьютера">
-          <figcaption>Компьютер</figcaption>
-        </figure>
-        <figure class="shot phone">
-          <img src="preview/p1-phone.jpg" alt="Паттерн «Тёплые листья» на странице кабинета, вид с телефона">
-          <figcaption>Телефон</figcaption>
-        </figure>
-      </div>
-    </section>
-
-    <section class="pattern">
-      <div class="pattern-head">
-        <span class="num">02</span>
-        <div>
-          <h2>Серо-бежевый сад</h2>
-          <p class="desc">Спокойные серо-бежевые листья. Мягкий, почти нейтральный фон.</p>
-        </div>
-      </div>
-      <div class="shots">
-        <figure class="shot desktop">
-          <img src="preview/p2-desktop.jpg" alt="Паттерн «Серо-бежевый сад» на странице кабинета, вид с компьютера">
-          <figcaption>Компьютер</figcaption>
-        </figure>
-        <figure class="shot phone">
-          <img src="preview/p2-phone.jpg" alt="Паттерн «Серо-бежевый сад» на странице кабинета, вид с телефона">
-          <figcaption>Телефон</figcaption>
-        </figure>
-      </div>
-    </section>
-
-    <section class="pattern">
-      <div class="pattern-head">
-        <span class="num">03</span>
-        <div>
-          <h2>Воздушные ветки</h2>
-          <p class="desc">Очень светлый разреженный узор. Почти бумага, не мешает тексту.</p>
-        </div>
-      </div>
-      <div class="shots">
-        <figure class="shot desktop">
-          <img src="preview/p3-desktop.jpg" alt="Паттерн «Воздушные ветки» на странице кабинета, вид с компьютера">
-          <figcaption>Компьютер</figcaption>
-        </figure>
-        <figure class="shot phone">
-          <img src="preview/p3-phone.jpg" alt="Паттерн «Воздушные ветки» на странице кабинета, вид с телефона">
-          <figcaption>Телефон</figcaption>
-        </figure>
-      </div>
-    </section>
-
-    <section class="pattern">
-      <div class="pattern-head">
-        <span class="num">04</span>
-        <div>
-          <h2>Бежевая акварель</h2>
-          <p class="desc">Акварельные ветки с бежевым и серым. Плотнее и заметнее остальных.</p>
-        </div>
-      </div>
-      <div class="shots">
-        <figure class="shot desktop">
-          <img src="preview/p4-desktop.jpg" alt="Паттерн «Бежевая акварель» на странице кабинета, вид с компьютера">
-          <figcaption>Компьютер</figcaption>
-        </figure>
-        <figure class="shot phone">
-          <img src="preview/p4-phone.jpg" alt="Паттерн «Бежевая акварель» на странице кабинета, вид с телефона">
-          <figcaption>Телефон</figcaption>
-        </figure>
-      </div>
-    </section>
-
-    <section class="pattern">
-      <div class="pattern-head">
-        <span class="num">05</span>
-        <div>
-          <h2>Шалфей на кремовом</h2>
-          <p class="desc">Крупные шалфейные ветки. Вертикальный рисунок, много воздуха.</p>
-        </div>
-      </div>
-      <div class="shots">
-        <figure class="shot desktop">
-          <img src="preview/p5-desktop.jpg" alt="Паттерн «Шалфей на кремовом» на странице кабинета, вид с компьютера">
-          <figcaption>Компьютер</figcaption>
-        </figure>
-        <figure class="shot phone">
-          <img src="preview/p5-phone.jpg" alt="Паттерн «Шалфей на кремовом» на странице кабинета, вид с телефона">
-          <figcaption>Телефон</figcaption>
-        </figure>
-      </div>
-    </section>
-
-    <section class="pattern">
-      <div class="pattern-head">
-        <span class="num">06</span>
-        <div>
-          <h2>Розово-серые листья</h2>
-          <p class="desc">Пыльно-розовые и серые листья. Самый декоративный вариант.</p>
-        </div>
-      </div>
-      <div class="shots">
-        <figure class="shot desktop">
-          <img src="preview/p6-desktop.jpg" alt="Паттерн «Розово-серые листья» на странице кабинета, вид с компьютера">
-          <figcaption>Компьютер</figcaption>
-        </figure>
-        <figure class="shot phone">
-          <img src="preview/p6-phone.jpg" alt="Паттерн «Розово-серые листья» на странице кабинета, вид с телефона">
-          <figcaption>Телефон</figcaption>
-        </figure>
-      </div>
-    </section>
+  <main class="grid">
+    <a class="card" href="view.html?p=p1">
+      <div class="swatch" style="background-image:url('patterns/p1.png')"></div>
+      <div class="body"><span class="num">01</span><h2>Тёплые листья</h2><p class="desc">Бежево-коричневые ветки на фактурном креме. Самый тёплый вариант.</p><span class="open">Открыть кабинет</span></div>
+    </a>
+    <a class="card" href="view.html?p=p2">
+      <div class="swatch" style="background-image:url('patterns/p2.png')"></div>
+      <div class="body"><span class="num">02</span><h2>Серо-бежевый сад</h2><p class="desc">Спокойные серо-бежевые листья. Мягкий, почти нейтральный фон.</p><span class="open">Открыть кабинет</span></div>
+    </a>
+    <a class="card" href="view.html?p=p3">
+      <div class="swatch" style="background-image:url('patterns/p3.png')"></div>
+      <div class="body"><span class="num">03</span><h2>Воздушные ветки</h2><p class="desc">Очень светлый разреженный узор. Почти бумага, не мешает тексту.</p><span class="open">Открыть кабинет</span></div>
+    </a>
+    <a class="card" href="view.html?p=p4">
+      <div class="swatch" style="background-image:url('patterns/p4.png')"></div>
+      <div class="body"><span class="num">04</span><h2>Бежевая акварель</h2><p class="desc">Акварельные ветки с бежевым и серым. Плотнее и заметнее остальных.</p><span class="open">Открыть кабинет</span></div>
+    </a>
+    <a class="card" href="view.html?p=p5">
+      <div class="swatch cover" style="background-image:url('patterns/p5.png')"></div>
+      <div class="body"><span class="num">05</span><h2>Шалфей на кремовом</h2><p class="desc">Крупные шалфейные ветки. Вертикальный рисунок, много воздуха.</p><span class="open">Открыть кабинет</span></div>
+    </a>
+    <a class="card" href="view.html?p=p6">
+      <div class="swatch" style="background-image:url('patterns/p6.png')"></div>
+      <div class="body"><span class="num">06</span><h2>Розово-серые листья</h2><p class="desc">Пыльно-розовые и серые листья. Самый декоративный вариант.</p><span class="open">Открыть кабинет</span></div>
+    </a>
   </main>
 
   <footer>
@@ -304,6 +111,5 @@
     <span>2026</span>
   </footer>
 </div>
-
 </body>
 </html>
