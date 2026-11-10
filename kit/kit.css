@@ -70,9 +70,9 @@ body::before {
 header.top { display: flex; align-items: baseline; gap: 14px 22px; flex-wrap: wrap; }
 header.top h1 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 40px; line-height: 1; }
 header.top nav { display: flex; gap: 6px; flex-wrap: wrap; }
-header.top nav a { color: var(--page-muted, var(--muted)); text-decoration: none; font-size: 13px; padding: 6px 12px; border: 1px solid var(--page-line, var(--line)); border-radius: 99px; }
+header.top nav a { color: var(--page-muted, var(--muted)); text-decoration: none; font-size: 13px; padding: 6px 12px; border: 1px solid var(--page-line, var(--line)); border-radius: 99px; background: var(--page-bg, var(--bg)); }
 header.top nav a[aria-current="page"] { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
-.uiswitch { margin-left: auto; display: flex; border: 1px solid var(--page-line, var(--line)); border-radius: 99px; overflow: hidden; }
+.uiswitch { margin-left: auto; display: flex; border: 1px solid var(--page-line, var(--line)); border-radius: 99px; overflow: hidden; background: var(--page-bg, var(--bg)); }
 .uiswitch button { border: 0; background: none; color: var(--page-muted, var(--muted)); font: inherit; font-size: 12.5px; padding: 7px 12px; cursor: pointer; white-space: nowrap; }
 .uiswitch button + button { border-left: 1px solid var(--page-line, var(--line)); }
 .uiswitch button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }

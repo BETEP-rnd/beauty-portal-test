@@ -651,7 +651,7 @@
             exit.dataset.accountExit = "1";
             exit.textContent = "Выйти";
             exit.setAttribute("aria-label", "Выйти из аккаунта");
-            exit.style.cssText = "color:var(--page-muted,var(--muted));background:none;border:1px solid var(--page-line,var(--line));border-radius:99px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;";
+            exit.style.cssText = "color:var(--page-muted,var(--muted));background:var(--page-bg,var(--bg));border:1px solid var(--page-line,var(--line));border-radius:99px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;";
             exit.addEventListener("mouseenter", () => { exit.style.color = "var(--accent)"; exit.style.borderColor = "var(--accent)"; });
             exit.addEventListener("mouseleave", () => { exit.style.color = "var(--page-muted,var(--muted))"; exit.style.borderColor = "var(--page-line,var(--line))"; });
             exit.addEventListener("click", logoutAccount);
