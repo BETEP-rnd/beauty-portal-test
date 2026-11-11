@@ -62,7 +62,7 @@
   .svc-item:disabled { opacity: .45; cursor: default; }
   .demo a { color: var(--accent); }
   .done .big { font-family: var(--display); font-size: 34px; color: var(--accent); }
-</style>
+  a.btn { text-align: center; text-decoration: none; }\n</style>
 </head>
 <body>
 <div class="wrap">
@@ -121,6 +121,8 @@
       <label class="check"><input type="checkbox" id="cAgree"> Согласна(ен) на обработку персональных данных для записи</label>
       <button class="btn" type="button" id="send">Записаться</button>
       <div class="status" id="status" role="status"></div>
+      <a class="btn ghost" id="tgNotify" href="#" target="_blank" rel="noopener" hidden>Подключить оповещения ТГ</a>
+      <div class="hint" id="tgNotifyHint" hidden>Оповещения через официального Telegram-бота Мастерфолио</div>
     </section>
 
     </div>
@@ -129,6 +131,8 @@
       <div class="big">Вы записаны!</div>
       <div class="summary" id="doneText" style="text-align:left"></div>
       <div class="hint" id="doneHint"></div>
+      <a class="btn ghost" id="tgNotifyDone" href="#" target="_blank" rel="noopener" hidden>Подключить оповещения ТГ</a>
+      <div class="hint" id="tgNotifyDoneHint" hidden>Оповещения через официального Telegram-бота Мастерфолио</div>
       <button class="btn ghost" type="button" id="again">Записаться ещё</button>
     </section>
   </div>
@@ -410,6 +414,11 @@ async function init() {
       prof = data.profile || prof;
       price = data.price || {};
       win = data.windows || {};
+      const botUrl = data.botUrl || "";
+      if (botUrl) {
+        ["tgNotify", "tgNotifyDone"].forEach(id => { const el = $(id); if (el) { el.href = botUrl + "?start=notify"; el.hidden = false; } });
+        ["tgNotifyHint", "tgNotifyDoneHint"].forEach(id => { const el = $(id); if (el) el.hidden = false; });
+      }
       $("demo").hidden = true;
     } catch (error) {
       $("demo").hidden = false;

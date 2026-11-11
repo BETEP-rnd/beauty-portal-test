@@ -689,8 +689,53 @@ async function completePhoneRegistration(req, res) {
 }
 
 async function processTelegramUpdate(update) {
+  const callback = update.callback_query;
+  if (callback) {
+    try {
+      const match = String(callback.data || "").match(/^booking:([0-9a-f-]{36}):(confirm|decline)$/i);
+      if (!match) { await telegramApi("answerCallbackQuery", { callback_query_id: callback.id }); return; }
+      const status = match[2] === "confirm" ? "confirmed" : "declined";
+      const result = await pool.query(
+        `UPDATE booking_requests r
+         SET status = $1, confirmed_at = CASE WHEN $1 = 'confirmed' THEN now() ELSE r.confirmed_at END,
+             declined_at = CASE WHEN $1 = 'declined' THEN now() ELSE r.declined_at END
+         FROM telegram_links l
+         WHERE r.id = $2 AND r.master_id = l.master_id AND l.chat_id = $3 AND r.status = 'pending'
+         RETURNING r.client_chat_id, r.services, r.day, r.time`,
+        [status, match[1], callback.from.id]
+      );
+      if (!result.rows.length) {
+        await telegramApi("answerCallbackQuery", { callback_query_id: callback.id, text: "Заявка уже обработана или истекла." });
+        return;
+      }
+      const row = result.rows[0];
+      await telegramApi("answerCallbackQuery", { callback_query_id: callback.id, text: status === "confirmed" ? "Запись подтверждена." : "Заявка отклонена." });
+      if (callback.message) {
+        const base = String(callback.message.text || "Заявка на запись");
+        await telegramApi("editMessageText", { chat_id: callback.message.chat.id, message_id: callback.message.message_id, text: `${base}\n\n${status === "confirmed" ? "Подтверждено" : "Отклонено"}`, reply_markup: { inline_keyboard: [] } }).catch(() => {});
+      }
+      if (row.client_chat_id) {
+        const list = Array.isArray(row.services) ? row.services.join(", ") : "";
+        const text = status === "confirmed"
+          ? `Мастер подтвердил запись.\n\n${list}\n${ruDay(row.day)} в ${row.time}\n\nЖдём вас!`
+          : `Мастер не сможет принять запись.\n\n${list}\n${ruDay(row.day)} в ${row.time}\n\nВыберите другое время.`;
+        await telegramApi("sendMessage", { chat_id: row.client_chat_id, text }).catch(() => {});
+      }
+    } catch (error) {
+      console.error("booking callback:", error.message);
+    }
+    return;
+  }
   const message = update.message;
   if (message?.text?.startsWith("/start")) {
+    if (message.text.trim() === "/start notify") {
+      await telegramApi("sendMessage", {
+        chat_id: message.chat.id,
+        text: "Подключите оповещения Мастерфолио.\n\nНажмите «Отправить контакт», чтобы мы сообщили вам, когда мастер подтвердит запись.",
+        reply_markup: { keyboard: [[{ text: "Отправить контакт", request_contact: true }]], resize_keyboard: true, one_time_keyboard: true }
+      });
+      return;
+    }
     const match = message.text.match(/^\/start\s+([0-9a-f-]{36})$/i);
     if (match) {
       let purpose = "login";
@@ -725,7 +770,13 @@ async function processTelegramUpdate(update) {
         await pool.query(`UPDATE ${table} SET telegram_chat_id = $1 WHERE id = $2`, [message.chat.id, attempt.id]);
         await sendPhoneCode(attempt, attempt.purpose);
       } else {
-        await telegramApi("sendMessage", { chat_id: message.chat.id, text: "Не нашёл активную заявку с таким номером. Вернитесь на страницу и снова нажмите «Получить код».", reply_markup: { remove_keyboard: true } });
+        try {
+          await pool.query("INSERT INTO telegram_clients (phone, chat_id, username) VALUES ($1, $2, $3) ON CONFLICT (phone) DO UPDATE SET chat_id = EXCLUDED.chat_id, username = EXCLUDED.username, updated_at = now()", [phone, message.chat.id, message.from.username || null]);
+          await pool.query("UPDATE booking_requests SET client_chat_id = $1 WHERE phone = $2 AND status = 'pending'", [message.chat.id, phone]);
+          await telegramApi("sendMessage", { chat_id: message.chat.id, text: "Оповещения подключены. Сообщим, когда мастер подтвердит запись.", reply_markup: { remove_keyboard: true } });
+        } catch (error) {
+          await telegramApi("sendMessage", { chat_id: message.chat.id, text: "Не удалось подключить оповещения. Попробуйте ещё раз.", reply_markup: { remove_keyboard: true } });
+        }
       }
     }
   }
@@ -746,7 +797,7 @@ async function pollTelegram() {
   if (savedOffset.rows[0]) offset = Number(savedOffset.rows[0].value);
   while (true) {
     try {
-      const updates = await telegramApi("getUpdates", { offset, timeout: 50, allowed_updates: ["message"] }, 65000);
+      const updates = await telegramApi("getUpdates", { offset, timeout: 50, allowed_updates: ["message", "callback_query"] }, 65000);
       for (const update of updates) {
         offset = update.update_id + 1;
         await processTelegramUpdate(update);
@@ -787,7 +838,7 @@ async function bookingPublic(req, res, slug) {
   if (!validBookingSlug(slug)) throw new HttpError(404, "Страница записи не найдена.");
   const result = await pool.query("SELECT data, updated_at FROM booking_profiles WHERE slug = $1", [slug]);
   if (!result.rows.length) throw new HttpError(404, "Страница записи не найдена или снята с публикации.");
-  json(res, 200, { ...result.rows[0].data, updatedAt: result.rows[0].updated_at });
+  json(res, 200, { ...result.rows[0].data, updatedAt: result.rows[0].updated_at, botUrl: process.env.TELEGRAM_BOT_USERNAME ? "https://t.me/" + process.env.TELEGRAM_BOT_USERNAME : "" });
 }
 
 async function bookingRequest(req, res) {
@@ -812,6 +863,13 @@ async function bookingRequest(req, res) {
   const found = await pool.query("SELECT master_id, data FROM booking_profiles WHERE slug = $1", [slug]);
   if (!found.rows.length) throw new HttpError(404, "Страница записи не найдена или снята с публикации.");
   const row = found.rows[0];
+  await pool.query("UPDATE booking_requests SET status = 'expired' WHERE status = 'pending' AND hold_until < now()");
+  const active = await pool.query("SELECT 1 FROM booking_requests WHERE master_id = $1 AND phone = $2 AND status = 'pending'", [row.master_id, phone]);
+  if (active.rows.length) throw new HttpError(409, "У вас уже есть активная заявка к этому мастеру. Дождитесь ответа.");
+  const recent = await pool.query("SELECT count(*)::int AS n FROM booking_requests WHERE master_id = $1 AND phone = $2 AND created_at > now() - interval '24 hours'", [row.master_id, phone]);
+  if (recent.rows[0].n >= 3) throw new HttpError(429, "Слишком много заявок с этого номера. Попробуйте завтра.");
+  const client = await pool.query("SELECT chat_id FROM telegram_clients WHERE phone = $1", [phone]);
+  const clientChatId = client.rows[0]?.chat_id || null;
   const free = row.data && row.data.windows && row.data.windows.free;
   const intervals = free && free[day];
   const minutes = hour * 60 + minute;
@@ -819,23 +877,33 @@ async function bookingRequest(req, res) {
     throw new HttpError(409, "Это время уже недоступно. Обновите страницу и выберите другое.");
   }
   const insert = await pool.query(
-    "INSERT INTO booking_requests (master_id, name, phone, services, day, time, comment) VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7) RETURNING id",
-    [row.master_id, name, phone, JSON.stringify(services), day, time, comment]
+    "INSERT INTO booking_requests (master_id, name, phone, services, day, time, comment, client_chat_id) VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8) RETURNING id",
+    [row.master_id, name, phone, JSON.stringify(services), day, time, comment, clientChatId]
   );
   try {
     const link = await pool.query("SELECT chat_id FROM telegram_links WHERE master_id = $1", [row.master_id]);
     if (link.rows.length && process.env.TELEGRAM_BOT_TOKEN) {
-      const text = `Новая заявка на запись\n${name}, ${phone}\n${services.join(", ")}\n${ruDay(day)} в ${time}${comment ? "\n" + comment : ""}`;
-      await telegramApi("sendMessage", { chat_id: link.rows[0].chat_id, text });
+      const text = `Новая заявка на запись\n${name}, ${phone}\n${services.join(", ")}\n${ruDay(day)} в ${time}${comment ? "\n" + comment : ""}\n\nПодтвердите или отклоните заявку:`;
+      await telegramApi("sendMessage", {
+        chat_id: link.rows[0].chat_id,
+        text,
+        reply_markup: { inline_keyboard: [[{ text: "Подтвердить", callback_data: `booking:${insert.rows[0].id}:confirm` }, { text: "Отклонить", callback_data: `booking:${insert.rows[0].id}:decline` }]] }
+      });
     }
   } catch (error) {
     console.error("booking notify:", error.message);
+  }
+  if (clientChatId) {
+    try {
+      await telegramApi("sendMessage", { chat_id: clientChatId, text: `Заявка отправлена мастеру:\n${services.join(", ")}\n${ruDay(day)} в ${time}\n\nСообщим, когда мастер подтвердит запись.` });
+    } catch (error) {}
   }
   json(res, 201, { ok: true, id: insert.rows[0].id, status: "pending" });
 }
 
 async function bookingRequests(req, res) {
   const master = await requireMaster(req);
+  await pool.query("UPDATE booking_requests SET status = 'expired' WHERE master_id = $1 AND status = 'pending' AND hold_until < now()", [master.id]);
   const result = await pool.query(
     "SELECT id, name, phone, services, to_char(day, 'YYYY-MM-DD') AS day, time, comment, status, created_at FROM booking_requests WHERE master_id = $1 ORDER BY created_at DESC LIMIT 30",
     [master.id]

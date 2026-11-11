@@ -125,3 +125,21 @@ CREATE TABLE IF NOT EXISTS booking_requests (
 );
 
 CREATE INDEX IF NOT EXISTS booking_requests_master_idx ON booking_requests (master_id, created_at DESC);
+
+ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS client_chat_id bigint;
+ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS hold_until timestamptz NOT NULL DEFAULT now() + interval '2 hours';
+ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS confirmed_at timestamptz;
+ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS declined_at timestamptz;
+ALTER TABLE booking_requests DROP CONSTRAINT IF EXISTS booking_requests_status_check;
+ALTER TABLE booking_requests ADD CONSTRAINT booking_requests_status_check CHECK (status IN ('pending', 'confirmed', 'declined', 'expired'));
+
+CREATE TABLE IF NOT EXISTS telegram_clients (
+  phone text PRIMARY KEY,
+  chat_id bigint NOT NULL,
+  username text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS telegram_clients_chat_idx ON telegram_clients (chat_id);
+CREATE INDEX IF NOT EXISTS booking_requests_client_idx ON booking_requests (client_chat_id);
