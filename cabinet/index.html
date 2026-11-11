@@ -183,7 +183,7 @@ async function loadRequests() {
     $("requestsList").innerHTML = list.map(r => {
       const day = r.day ? r.day.split("-").reverse().join(".") : "";
       const services = Array.isArray(r.services) ? r.services.join(", ") : "";
-      const status = r.status === "confirmed" ? "подтверждена" : r.status === "declined" ? "отклонена" : "ожидает";
+      const status = r.status === "confirmed" ? "подтверждена" : r.status === "declined" ? "отклонена" : r.status === "expired" ? "истекла" : "ожидает";
       return `<div class="request"><b>${Kit.esc(r.name)}</b> <a href="tel:${Kit.esc(r.phone)}">${Kit.esc(Kit.fmtPhone(r.phone) || r.phone)}</a><span>${Kit.esc(day)} ${Kit.esc(r.time)} · ${Kit.esc(services)} · ${status}</span>${r.comment ? `<span>${Kit.esc(r.comment)}</span>` : ""}</div>`;
     }).join("");
   } catch (error) {}
