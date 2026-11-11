@@ -70,7 +70,11 @@
     #sort button { font-size: 11.5px; padding-left: 2px; padding-right: 2px; }
   }
 
+  .cc-black { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-top: 8px; margin-top: 2px; border-top: 1px dashed var(--line); }
+  .cc-black .linkbtn[disabled] { opacity: .4; cursor: default; }
+  .cc-black .flag { color: var(--accent); font-size: 12px; font-weight: 600; }
 </style>
+
 </head>
 <body>
 <div class="wrap">
@@ -99,6 +103,7 @@
       </div>
       <div id="list" class="clist"></div>
       <div class="count" id="count"></div>
+      <div class="status" id="blackStatus"></div>
     </section>
 
     <section class="box">
@@ -117,6 +122,8 @@
 <script src="../kit/kit.js?v=202611110807"></script>
 <script>
 const { esc, normPhone, fmtPhone, maskPhone } = Kit, $ = id => document.getElementById(id);
+const API_URL = "https://api.masterfolio.ru";
+let blocked = new Set();
 const MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
 const MONTHS1 = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
 const pad = n => String(n).padStart(2, "0");
@@ -183,6 +190,7 @@ function sorted() {
 }
 function card(c) {
   const n = nextBd(c), p = normPhone(c.phone), sv = Object.entries(c.svcs || {}).filter(([, k]) => k > 0).sort((a, b) => b[1] - a[1]);
+  const isBlocked = !!p && blocked.has(p);
   return `<article class="cc" data-id="${esc(c.id)}">
     <div class="cc-top"><b>${esc(c.name)}</b>${c.d && c.m ? `<span class="cc-bd${n && n.days <= 30 ? " soon" : ""}">🎂 ${bdText(c)}${n && n.days <= 30 ? " · " + whenText(n) : ""}</span>` : ""}</div>
     ${c.phone ? `<div class="cc-ph">${p ? `<a href="tel:+${p}">${esc(fmtPhone(c.phone))}</a><a href="https://wa.me/${p}" target="_blank" rel="noopener">WhatsApp</a><a href="https://t.me/+${p}" target="_blank" rel="noopener">Telegram</a>` : esc(c.phone)}</div>` : ""}
@@ -190,6 +198,11 @@ function card(c) {
     <div class="cc-meta">${visits(c) ? `${visits(c)} ${plural(visits(c), "услуга", "услуги", "услуг")} всего` : "услуг пока нет"}${c.last ? ` · последний визит ${ruDate(c.last)}` : ""}</div>
     ${c.note ? `<div class="cc-note">${esc(c.note)}</div>` : ""}
     <div class="cc-act"><button class="linkbtn" type="button" data-edit>Изменить</button><button class="linkbtn" type="button" data-visit>+ Визит</button>${c.d && c.m ? `<a class="linkbtn" href="../certs/?to=${encodeURIComponent(c.name)}">Сертификат</a>` : ""}</div>
+    <div class="cc-black">
+      <button class="linkbtn" type="button" data-block="${esc(p)}" ${isBlocked || !p ? "disabled" : ""}>Добавить в ЧС</button>
+      <button class="linkbtn" type="button" data-unblock="${esc(p)}" ${isBlocked && p ? "" : "disabled"}>Исключить из ЧС</button>
+      ${isBlocked ? '<span class="flag">В ЧС</span>' : ""}
+    </div>
   </article>`;
 }
 function form() {
@@ -247,6 +260,8 @@ function openForm(id, visit) {
 function closeForm() { editing = draft = null; build(); }
 
 $("list").addEventListener("click", e => {
+  const black = e.target.closest("[data-block], [data-unblock]");
+  if (black) { setBlacklist(black.dataset.block || black.dataset.unblock, black.dataset.block ? "add" : "remove"); return; }
   const cc = e.target.closest(".cc");
   if (cc && e.target.closest("[data-edit]")) return openForm(cc.dataset.id);
   if (cc && e.target.closest("[data-visit]")) return openForm(cc.dataset.id, true);
@@ -309,7 +324,34 @@ $("file").addEventListener("change", async e => {
   } catch (x) { setStatus("Это не файл с копией клиентов.", "err"); }
 });
 
+async function setBlacklist(phone, action) {
+  const status = $("blackStatus");
+  status.className = "status";
+  status.textContent = "";
+  try {
+    const response = await fetch(API_URL + "/api/booking/blacklist", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone, action }) });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Не удалось сохранить.");
+    blocked = new Set((result.phones || []).map(p => normPhone(p.phone)).filter(Boolean));
+    status.className = "status ok";
+    status.textContent = action === "add" ? "Клиент добавлен в ЧС." : "Клиент исключён из ЧС.";
+    build();
+  } catch (error) {
+    status.className = "status err";
+    status.textContent = error.message;
+  }
+}
+async function loadBlacklist() {
+  try {
+    const response = await fetch(API_URL + "/api/booking/blacklist", { credentials: "include" });
+    if (!response.ok) return;
+    const data = await response.json();
+    blocked = new Set((data.phones || []).map(p => normPhone(p.phone)).filter(Boolean));
+    build();
+  } catch (error) {}
+}
 build();
+loadBlacklist();
 </script>
 </body>
 </html>
