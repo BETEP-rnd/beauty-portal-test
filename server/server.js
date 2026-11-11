@@ -700,7 +700,7 @@ async function processTelegramUpdate(update) {
          SET status = $1, confirmed_at = CASE WHEN $1 = 'confirmed' THEN now() ELSE r.confirmed_at END,
              declined_at = CASE WHEN $1 = 'declined' THEN now() ELSE r.declined_at END
          FROM telegram_links l
-         WHERE r.id = $2 AND r.master_id = l.master_id AND l.chat_id = $3 AND r.status = 'pending'
+         WHERE r.id = $2 AND r.master_id = l.master_id AND l.chat_id = $3 AND r.status = 'pending' AND r.hold_until > now()
          RETURNING r.client_chat_id, r.services, r.day, r.time`,
         [status, match[1], callback.from.id]
       );
