@@ -100,3 +100,28 @@ CREATE TABLE IF NOT EXISTS certificates (
 );
 
 CREATE INDEX IF NOT EXISTS certificates_master_idx ON certificates (master_id, number DESC);
+
+CREATE TABLE IF NOT EXISTS booking_profiles (
+  master_id uuid PRIMARY KEY REFERENCES masters(id) ON DELETE CASCADE,
+  slug text NOT NULL UNIQUE,
+  data jsonb NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS booking_profiles_slug_idx ON booking_profiles (slug);
+
+CREATE TABLE IF NOT EXISTS booking_requests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  master_id uuid NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+  name varchar(60) NOT NULL,
+  phone text NOT NULL,
+  services jsonb NOT NULL,
+  day date NOT NULL,
+  time text NOT NULL,
+  comment text,
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'declined')),
+  consent_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS booking_requests_master_idx ON booking_requests (master_id, created_at DESC);
