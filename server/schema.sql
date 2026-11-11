@@ -127,7 +127,8 @@ CREATE TABLE IF NOT EXISTS booking_requests (
 CREATE INDEX IF NOT EXISTS booking_requests_master_idx ON booking_requests (master_id, created_at DESC);
 
 ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS client_chat_id bigint;
-ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS hold_until timestamptz NOT NULL DEFAULT now() + interval '2 hours';
+ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS hold_until timestamptz NOT NULL DEFAULT now() + interval '5 hours';
+ALTER TABLE booking_requests ALTER COLUMN hold_until SET DEFAULT now() + interval '5 hours';
 ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS confirmed_at timestamptz;
 ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS declined_at timestamptz;
 ALTER TABLE booking_requests DROP CONSTRAINT IF EXISTS booking_requests_status_check;
@@ -143,3 +144,13 @@ CREATE TABLE IF NOT EXISTS telegram_clients (
 
 CREATE INDEX IF NOT EXISTS telegram_clients_chat_idx ON telegram_clients (chat_id);
 CREATE INDEX IF NOT EXISTS booking_requests_client_idx ON booking_requests (client_chat_id);
+
+CREATE TABLE IF NOT EXISTS booking_blacklist (
+  master_id uuid NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+  phone text NOT NULL,
+  reason text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (master_id, phone)
+);
+
+CREATE INDEX IF NOT EXISTS booking_blacklist_master_idx ON booking_blacklist (master_id, created_at DESC);
