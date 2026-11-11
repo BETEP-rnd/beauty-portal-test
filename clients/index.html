@@ -72,7 +72,10 @@
 
   .cc-black { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-top: 8px; margin-top: 2px; border-top: 1px dashed var(--line); }
   .cc-black .linkbtn[disabled] { opacity: .4; cursor: default; }
-  .cc-black .flag { color: var(--accent); font-size: 12px; font-weight: 600; }
+  .cc-black .flag { display: inline-flex; width: 18px; height: 18px; color: var(--accent); }
+  .cc-black .flag svg { display: block; width: 18px; height: 18px; }
+  .cc-black .flag .cut { stroke: var(--field); }
+
 </style>
 
 </head>
@@ -124,6 +127,8 @@
 const { esc, normPhone, fmtPhone, maskPhone } = Kit, $ = id => document.getElementById(id);
 const API_URL = "https://api.masterfolio.ru";
 let blocked = new Set();
+const BLACK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><rect x="7.5" y="9" width="9" height="10" rx="4"/><rect x="8" y="4" width="2.2" height="8" rx="1.1"/><rect x="10.7" y="3" width="2.2" height="9" rx="1.1"/><rect x="13.4" y="3.6" width="2.2" height="8.4" rx="1.1"/><rect x="16.1" y="5" width="2.2" height="7" rx="1.1"/><rect x="4.6" y="9.5" width="3" height="6.5" rx="1.5" transform="rotate(-35 6.1 12.7)"/></g><path class="cut" d="M4 4l16 16" fill="none" stroke-width="2.4" stroke-linecap="round"/></svg>';
+
 const MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
 const MONTHS1 = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
 const pad = n => String(n).padStart(2, "0");
@@ -201,7 +206,7 @@ function card(c) {
     <div class="cc-black">
       <button class="linkbtn" type="button" data-block="${esc(p)}" ${isBlocked || !p ? "disabled" : ""}>Добавить в ЧС</button>
       <button class="linkbtn" type="button" data-unblock="${esc(p)}" ${isBlocked && p ? "" : "disabled"}>Исключить из ЧС</button>
-      ${isBlocked ? '<span class="flag">В ЧС</span>' : ""}
+      ${isBlocked ? `<span class="flag" role="img" aria-label="В чёрном списке" title="В чёрном списке">${BLACK_ICON}</span>` : ""}
     </div>
   </article>`;
 }
