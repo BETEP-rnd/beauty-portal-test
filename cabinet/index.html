@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f8f2ec">
 <title>Личный кабинет — Мастерфолио</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500&family=Manrope:wght@400;500;600;700&family=Montserrat:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="../kit/kit.css?v=202611102228">
+<link rel="stylesheet" href="../kit/kit.css?v=202611110807">
 <script>try { var u = localStorage.getItem("beauty.ui"); if (u) document.documentElement.dataset.ui = u; } catch (e) {}</script>
 <style>
   /* Кабинет: слева приветствие и разделы, справа «Мои данные»; на телефоне — друг под другом. */
@@ -29,6 +29,13 @@
   .me .check { font-size: 16px; }
   .me .check.logo, .me .sochead span, .me .hint, .me .linkbtn { font-size: 14px; }
   .me .seg button { font-size: 15px; }
+  .publish .btn { margin-top: 10px; width: 100%; }
+  .publish .hint { margin-top: 8px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .publish a, .request a { color: var(--accent); }
+  .requests .request { display: flex; flex-direction: column; gap: 3px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.45; }
+  .requests .request:first-child { border-top: 0; padding-top: 0; }
+  .requests .request span { color: var(--muted); }
+
   @media (min-width: 421px) { .me .socin { grid-template-columns: 128px minmax(0, 1fr) auto; } }
   .me .check input { width: 18px; height: 18px; }
   .me input[type="text"], .me input[type="tel"], .me input[type="url"], .me input[type="email"] { font-size: 17px; }
@@ -60,16 +67,27 @@
       <a class="card" href="../price/"><b>Прайс-лист</b><span>Услуги и цены, свои услуги, 300 фонов, шрифты — картинка для сторис и мессенджеров.</span></a>
       <a class="card" href="../windows/"><b>Свободные окошки</b><span>Отметьте свободное время на неделю или на 2–3 месяца — картинка для канала или сторис.</span></a>
       <a class="card" href="../certs/"><b>Подарочные сертификаты</b><span>Выпуск сертификата с номером, проверка и погашение, журнал — по PIN. 300 фонов и шрифты, как в других разделах.</span></a>
-      <a class="card" href="../booking/"><b>Онлайн-запись</b><span>Демо: так клиенты увидят свободные окошки, выберут услугу и время и запишутся.</span></a>
-      <a class="card" href="../clients/"><b>Мои клиенты</b><span>Телефоны, дни рождения, любимые услуги и сколько раз их делали. Напомнит, кому скоро дарить сертификат. Демо: данные только в этом браузере.</span></a>
+      <a class="card" id="bookingCard" href="../booking/"><b>Онлайн-запись</b><span>Клиенты выберут услугу и время, оставят заявку, а вы подтвердите запись.</span></a>      <a class="card" href="../clients/"><b>Мои клиенты</b><span>Телефоны, дни рождения, любимые услуги и сколько раз их делали. Напомнит, кому скоро дарить сертификат. Демо: данные только в этом браузере.</span></a>
+
+      <div class="card publish" id="publishCard">
+        <b>Онлайн-запись для клиентов</b>
+        <span>Опубликуйте прайс и свободные окошки. Клиенты откроют запись по QR и оставят заявку.</span>
+        <button class="btn" type="button" id="publishBtn">Опубликовать</button>
+        <div class="hint" id="publishStatus"></div>
+        <a id="publishLink" hidden target="_blank" rel="noopener">Открыть страницу записи</a>
+      </div>
+      <div class="card requests" id="requestsCard" hidden>
+        <b>Заявки на запись</b>
+        <div id="requestsList"></div>
+      </div>
     </div>
     <div class="panel me" id="me"></div>
   </div>
 </div>
 
-<script src="../kit/backgrounds.js?v=202611102228"></script>
-<script src="../kit/trends.js?v=202611102228"></script>
-<script src="../kit/kit.js?v=202611102228"></script>
+<script src="../kit/backgrounds.js?v=202611110807"></script>
+<script src="../kit/trends.js?v=202611110807"></script>
+<script src="../kit/kit.js?v=202611110807"></script>
 <script>
 const API_URL = "https://api.masterfolio.ru";
 (async () => {
@@ -110,6 +128,67 @@ if (want === "email" || want === "hideBusy") panel.focus(want);
 else if (prof.soc[want]) panel.focus(prof.soc[want].val.trim() || want === "wa" ? want + "-on" : "soc-" + want);
 Kit.saveProfile(prof);                                          // данные по умолчанию сразу видны и в разделах
 hello();
+const publishBtn = $("publishBtn"), publishStatus = $("publishStatus"), publishLink = $("publishLink"), bookingCard = $("bookingCard");
+function showPublished() {
+  if (!prof.bookingUrl) return;
+  publishStatus.textContent = "Опубликовано. Клиенты смогут записаться по ссылке.";
+  publishLink.href = prof.bookingUrl; publishLink.hidden = false;
+  if (bookingCard) bookingCard.href = prof.bookingUrl;
+  const qr = document.getElementById("k-qrBooking"); if (qr) qr.disabled = false;
+}
+showPublished();
+publishBtn.addEventListener("click", async () => {
+  if (!signedIn) { publishStatus.textContent = "Сначала войдите в аккаунт."; return; }
+  const priceState = Kit.loadJSON("price.v1") || {}, winState = Kit.loadJSON("windows.v1") || {};
+  const services = (priceState.services || []).filter(s => s && s.name && String(s.name).trim()).map(s => ({ name: String(s.name).trim(), price: String(s.price || "").trim() }));
+  if (!services.length) { publishStatus.textContent = "Сначала добавьте услуги в прайс-листе."; return; }
+  const free = {};
+  if (winState.free) Object.entries(winState.free).forEach(([iso, list]) => {
+    if (!Array.isArray(list)) return;
+    const pairs = list.filter(pair => Array.isArray(pair) && pair.length === 2 && Number.isFinite(pair[0]) && Number.isFinite(pair[1]) && pair[1] > pair[0]);
+    if (pairs.length) free[iso] = pairs;
+  });
+  if (!Object.keys(free).length) { publishStatus.textContent = "Сначала отметьте свободные окошки."; return; }
+  const soc = {};
+  Kit.SOCIALS.forEach(({ k }) => { const v = prof.soc[k] || {}; soc[k] = { on: !!v.on, val: v.on ? (v.val || "") : "", logo: !!v.logo }; });
+  const payload = {
+    profile: { master: prof.master, phone: prof.phone, email: prof.showEmail ? prof.email : "", showEmail: !!prof.showEmail, soc, socLayout: prof.socLayout },
+    price: { services, currency: priceState.currency || "руб." },
+    windows: { free, dayStart: winState.dayStart, dayEnd: winState.dayEnd, step: winState.step, minLen: winState.minLen }
+  };
+  publishBtn.disabled = true; publishStatus.textContent = "Публикуем…";
+  try {
+    const response = await fetch(API_URL + "/api/booking/publish", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Не удалось опубликовать.");
+    prof.bookingSlug = result.slug;
+    prof.bookingUrl = new URL("../booking/?m=" + encodeURIComponent(result.slug), location.href).href;
+    Kit.saveProfile(prof);
+    publishStatus.textContent = "Опубликовано. Клиенты смогут записаться по ссылке.";
+    publishLink.href = prof.bookingUrl; publishLink.hidden = false;
+    if (bookingCard) bookingCard.href = prof.bookingUrl;
+    const qr = document.getElementById("k-qrBooking"); if (qr) qr.disabled = false;
+  } catch (error) { publishStatus.textContent = error.message; }
+  finally { publishBtn.disabled = false; }
+});
+async function loadRequests() {
+  if (!signedIn) return;
+  try {
+    const response = await fetch(API_URL + "/api/booking/requests", { credentials: "include" });
+    if (!response.ok) return;
+    const data = await response.json();
+    const list = data.requests || [];
+    if (!list.length) return;
+    $("requestsCard").hidden = false;
+    $("requestsList").innerHTML = list.map(r => {
+      const day = r.day ? r.day.split("-").reverse().join(".") : "";
+      const services = Array.isArray(r.services) ? r.services.join(", ") : "";
+      const status = r.status === "confirmed" ? "подтверждена" : r.status === "declined" ? "отклонена" : "ожидает";
+      return `<div class="request"><b>${Kit.esc(r.name)}</b> <a href="tel:${Kit.esc(r.phone)}">${Kit.esc(Kit.fmtPhone(r.phone) || r.phone)}</a><span>${Kit.esc(day)} ${Kit.esc(r.time)} · ${Kit.esc(services)} · ${status}</span>${r.comment ? `<span>${Kit.esc(r.comment)}</span>` : ""}</div>`;
+    }).join("");
+  } catch (error) {}
+}
+loadRequests();
 if (params.get("yandex") === "ok") {
   const note = document.getElementById("ynote");
   note.hidden = false;

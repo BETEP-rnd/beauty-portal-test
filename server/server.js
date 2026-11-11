@@ -9,6 +9,7 @@ const { Pool } = require("pg");
 const PORT = Number(process.env.PORT || 3000);
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
 const BODY_LIMIT = 16 * 1024;
+const PUBLISH_BODY_LIMIT = 512 * 1024;
 const ALLOWED_ORIGINS = new Set((process.env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean));
 const YANDEX_CLIENT_ID = process.env.YANDEX_CLIENT_ID || "";
 const YANDEX_CLIENT_SECRET = process.env.YANDEX_CLIENT_SECRET || "";
@@ -41,12 +42,12 @@ function cors(req, res) {
   }
 }
 
-async function body(req) {
+async function body(req, limit = BODY_LIMIT) {
   let size = 0;
   const chunks = [];
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > BODY_LIMIT) throw new HttpError(413, "Слишком большой запрос.");
+    if (size > limit) throw new HttpError(413, "Слишком большой запрос.");
     chunks.push(chunk);
   }
   try {
@@ -758,6 +759,90 @@ async function pollTelegram() {
   }
 }
 
+function validBookingSlug(value) {
+  return /^[a-f0-9]{12}$/.test(String(value || ""));
+}
+
+async function bookingPublish(req, res) {
+  const master = await requireMaster(req);
+  const data = await body(req, PUBLISH_BODY_LIMIT);
+  const profile = data.profile, price = data.price, windows = data.windows;
+  if (!profile || typeof profile !== "object" || !price || typeof price !== "object" || !windows || typeof windows !== "object") {
+    throw new HttpError(400, "Некорректные данные для публикации.");
+  }
+  const payload = JSON.stringify({ profile, price, windows });
+  if (Buffer.byteLength(payload) > 400 * 1024) throw new HttpError(413, "Слишком большой объём данных.");
+  const slug = crypto.randomBytes(6).toString("hex");
+  const result = await pool.query(
+    `INSERT INTO booking_profiles (master_id, slug, data, updated_at)
+     VALUES ($1, $2, $3::jsonb, now())
+     ON CONFLICT (master_id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()
+     RETURNING slug`,
+    [master.id, slug, payload]
+  );
+  json(res, 200, { slug: result.rows[0].slug });
+}
+
+async function bookingPublic(req, res, slug) {
+  if (!validBookingSlug(slug)) throw new HttpError(404, "Страница записи не найдена.");
+  const result = await pool.query("SELECT data, updated_at FROM booking_profiles WHERE slug = $1", [slug]);
+  if (!result.rows.length) throw new HttpError(404, "Страница записи не найдена или снята с публикации.");
+  json(res, 200, { ...result.rows[0].data, updatedAt: result.rows[0].updated_at });
+}
+
+async function bookingRequest(req, res) {
+  const data = await body(req);
+  const slug = String(data.slug || "");
+  if (!validBookingSlug(slug)) throw new HttpError(404, "Страница записи не найдена.");
+  const name = String(data.name || "").trim().replace(/\s+/g, " ");
+  if (name.length < 2 || name.length > 60) throw new HttpError(400, "Укажите имя.");
+  const phone = normalizePhone(data.phone);
+  const services = Array.isArray(data.services) ? data.services.map(s => String(s || "").trim()).filter(Boolean).slice(0, 5) : [];
+  if (!services.length) throw new HttpError(400, "Выберите услугу.");
+  if (services.some(s => s.length > 100)) throw new HttpError(400, "Название услуги слишком длинное.");
+  const day = String(data.day || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new HttpError(400, "Выберите дату.");
+  const time = String(data.time || "");
+  const match = time.match(/^(\d{2}):(\d{2})$/);
+  if (!match) throw new HttpError(400, "Выберите время.");
+  const hour = Number(match[1]), minute = Number(match[2]);
+  if (hour > 23 || minute > 59) throw new HttpError(400, "Выберите время.");
+  if (data.consent !== true) throw new HttpError(400, "Нужно согласие на обработку данных.");
+  const comment = String(data.comment || "").trim().slice(0, 300);
+  const found = await pool.query("SELECT master_id, data FROM booking_profiles WHERE slug = $1", [slug]);
+  if (!found.rows.length) throw new HttpError(404, "Страница записи не найдена или снята с публикации.");
+  const row = found.rows[0];
+  const free = row.data && row.data.windows && row.data.windows.free;
+  const intervals = free && free[day];
+  const minutes = hour * 60 + minute;
+  if (!Array.isArray(intervals) || !intervals.some(pair => Array.isArray(pair) && pair.length === 2 && Number.isFinite(pair[0]) && Number.isFinite(pair[1]) && minutes >= pair[0] && minutes < pair[1])) {
+    throw new HttpError(409, "Это время уже недоступно. Обновите страницу и выберите другое.");
+  }
+  const insert = await pool.query(
+    "INSERT INTO booking_requests (master_id, name, phone, services, day, time, comment) VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7) RETURNING id",
+    [row.master_id, name, phone, JSON.stringify(services), day, time, comment]
+  );
+  try {
+    const link = await pool.query("SELECT chat_id FROM telegram_links WHERE master_id = $1", [row.master_id]);
+    if (link.rows.length && process.env.TELEGRAM_BOT_TOKEN) {
+      const text = `Новая заявка на запись\n${name}, ${phone}\n${services.join(", ")}\n${ruDay(day)} в ${time}${comment ? "\n" + comment : ""}`;
+      await telegramApi("sendMessage", { chat_id: link.rows[0].chat_id, text });
+    }
+  } catch (error) {
+    console.error("booking notify:", error.message);
+  }
+  json(res, 201, { ok: true, id: insert.rows[0].id, status: "pending" });
+}
+
+async function bookingRequests(req, res) {
+  const master = await requireMaster(req);
+  const result = await pool.query(
+    "SELECT id, name, phone, services, to_char(day, 'YYYY-MM-DD') AS day, time, comment, status, created_at FROM booking_requests WHERE master_id = $1 ORDER BY created_at DESC LIMIT 30",
+    [master.id]
+  );
+  json(res, 200, { requests: result.rows });
+}
+
 async function handle(req, res) {
   cors(req, res);
   if (req.method === "OPTIONS") {
@@ -811,6 +896,10 @@ async function handle(req, res) {
     if (!master) throw new HttpError(401, "Вход не выполнен.");
     return json(res, 200, { master });
   }
+  if (url.pathname === "/api/booking/publish" && req.method === "POST") { rateLimit(req, "booking-publish"); return await bookingPublish(req, res); }
+  if (url.pathname.startsWith("/api/booking/public/") && req.method === "GET") { rateLimit(req, "booking-public"); return await bookingPublic(req, res, url.pathname.slice("/api/booking/public/".length)); }
+  if (url.pathname === "/api/booking/request" && req.method === "POST") { rateLimit(req, "booking-request"); return await bookingRequest(req, res); }
+  if (url.pathname === "/api/booking/requests" && req.method === "GET") return await bookingRequests(req, res);
   throw new HttpError(404, "Адрес не найден.");
 }
 

@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f8f2ec">
 <title>Онлайн-запись</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500&family=Manrope:wght@400;500;600;700&family=Montserrat:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="../kit/kit.css?v=202611102228">
+<link rel="stylesheet" href="../kit/kit.css?v=202611110807">
 <script>try { var u = localStorage.getItem("beauty.ui"); if (u) document.documentElement.dataset.ui = u; } catch (e) {}</script>
 <style>
   /* Страница записи глазами клиента: шаги сверху вниз — услуга, день, время, контакты. */
@@ -134,9 +134,9 @@
   </div>
 </div>
 
-<script src="../kit/backgrounds.js?v=202611102228"></script>
-<script src="../kit/trends.js?v=202611102228"></script>
-<script src="../kit/kit.js?v=202611102228"></script>
+<script src="../kit/backgrounds.js?v=202611110807"></script>
+<script src="../kit/trends.js?v=202611110807"></script>
+<script src="../kit/kit.js?v=202611110807"></script>
 <script>
 // Демо: окошки берутся из раздела «Свободные окошки», услуги и цены — из «Прайс-листа» этого браузера.
 // Запись никуда не отправляется и не сохраняется.
@@ -154,8 +154,10 @@ const hm = m => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
 const durText = m => m < 60 ? `${m} мин` : m % 60 ? `${Math.floor(m / 60)} ч ${m % 60} мин` : `${m / 60} ч`;
 const today = toIso(new Date()), STEP = 30;
 
-const prof = Kit.loadProfile();
-const price = Kit.loadJSON("price.v1"), win = Kit.loadJSON("windows.v1");
+const PUBLIC = new URLSearchParams(location.search).get("m");
+const API_URL = "https://api.masterfolio.ru";
+let prof = Kit.loadProfile();
+let price = Kit.loadJSON("price.v1"), win = Kit.loadJSON("windows.v1");
 
 // услуги: из прайса; длительность для примера — по названию (у прайса её пока нет)
 function guessDur(name) {
@@ -171,13 +173,14 @@ function guessDur(name) {
 }
 const DEFAULT_SVCS = [["Уголки", "2100"], ["Наращивание нижних ресниц", "1000"], ["Объём 1D (классика)", "3000"], ["Объём 1,5D–2D", "3300"],
   ["Объём 2,5D–3D", "3600"], ["Объём 4D–5D", "4000"], ["Снятие ресниц без последующего наращивания", "500"]];
-const SVCS = ((price && price.services && price.services.length) ? price.services.map(s => [s.name, s.price]) : DEFAULT_SVCS)
+const svcsFromPrice = (allowDefaults = true) => ((price && price.services && price.services.length) ? price.services.map(s => [s.name, s.price]) : (allowDefaults ? DEFAULT_SVCS : []))
   .filter(([n]) => n && n.trim()).map(([name, p]) => ({ name: name.trim(), price: (p || "").trim(), dur: guessDur(name) }));
+let SVCS = svcsFromPrice();
 const money = p => !p ? "" : /₽|руб/i.test(p) || !/\d/.test(p) ? p : p.replace(/\d{4,}/g, group) + " " + ((price && price.currency) || "руб.");
 
 // окошки: из раздела «Свободные окошки»; если там пусто — пример на две недели
 let demoWindows = false;
-function windowsByDay() {
+function windowsByDay(allowDemo = true) {
   const out = {};
   const toMin = s => { const [h, m] = (s || "0:0").split(":").map(Number); return h * 60 + (m || 0); };
   if (win && win.free) {
@@ -189,6 +192,7 @@ function windowsByDay() {
     });
   }
   if (Object.keys(out).length) return out;
+  if (!allowDemo) return {};
   demoWindows = true;                                           // пример: 10:00–13:00 и 15:00–18:00 через день, по воскресеньям выходной
   for (let i = 1; i <= 14; i++) {
     const iso = addDays(today, i), dow = fromIso(iso).getDay();
@@ -197,7 +201,7 @@ function windowsByDay() {
   }
   return out;
 }
-const WIN = windowsByDay();
+let WIN = windowsByDay();
 // времена начала, когда услуга целиком помещается в окно
 const startsFor = (iso, dur) => (WIN[iso] || []).flatMap(([s, e]) => { const out = []; for (let t = s; t + dur <= e; t += STEP) out.push(t); return out; });
 
@@ -253,6 +257,15 @@ function step(id, on) { $(id).classList.toggle("off", !on); }
 function buildHeader() {
   $("who").textContent = prof.master.trim() || "Имя мастера";
   $("facts").innerHTML = Kit.contactsHtml(prof);
+  if (PUBLIC) {
+    const notes = [];
+    if (!SVCS.length) notes.push("Мастер пока не опубликовал услуги.");
+    if (!Object.keys(WIN).length) notes.push("Мастер пока не отметил свободное время.");
+    $("demo").innerHTML = notes.join(" ");
+    $("demo").hidden = !notes.length;
+    return;
+  }
+  $("demo").hidden = false;
   $("demo").innerHTML = `<b>Демо.</b> Так страницу записи увидят клиенты. Услуги и цены — из «Прайс-листа», окошки — из «Свободных окошек»`
     + (demoWindows ? ` (там пока пусто, поэтому показан пример на две недели — <a href="../windows/">отметить свои окошки</a>)` : "")
     + `. Длительность услуг пока примерная. Запись никуда не отправляется и не сохраняется.`;
@@ -337,10 +350,43 @@ $("calNext").addEventListener("click", () => shiftMonth(1));
 $("modes").addEventListener("click", e => { const b = e.target.closest("[data-k]"); if (!b) return; sel.mode = b.dataset.k; Kit.store.set("booking.mode", sel.mode); applyMode(); });
 $("cPhone").addEventListener("input", e => { e.target.value = maskPhone(e.target.value, (e.inputType || "").startsWith("delete")); });
 function setStatus(text, kind) { $("status").textContent = text; $("status").className = "status" + (kind ? " " + kind : ""); }
-$("send").addEventListener("click", () => {
+$("send").addEventListener("click", async () => {
   if (!$("cName").value.trim()) { setStatus("Укажите имя.", "err"); $("cName").focus(); return; }
   if (!normPhone($("cPhone").value)) { setStatus("Укажите телефон полностью.", "err"); $("cPhone").focus(); return; }
   if (!$("cAgree").checked) { setStatus("Нужно согласие на обработку данных.", "err"); return; }
+  if (!sel.svcs.length || !sel.day || sel.time == null) { setStatus("Выберите услугу, дату и время.", "err"); return; }
+  if (PUBLIC) {
+    const button = $("send");
+    button.disabled = true;
+    setStatus("Отправляем заявку…");
+    try {
+      const response = await fetch(API_URL + "/api/booking/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug: PUBLIC,
+          name: $("cName").value.trim(),
+          phone: $("cPhone").value,
+          services: sel.svcs.map(i => SVCS[i].name),
+          day: sel.day,
+          time: hm(sel.time),
+          comment: $("cNote").value.trim(),
+          consent: true
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Не удалось отправить заявку.");
+      $("doneText").innerHTML = `${summaryText()}<br>Мастер: ${esc(prof.master.trim())}, ${esc(fmtPhone(prof.phone))}<br>Вы: ${esc($("cName").value.trim())}, ${esc(fmtPhone($("cPhone").value))}`;
+      $("doneHint").textContent = "Заявка отправлена. Мастер подтвердит запись и свяжется с вами.";
+      const big = document.querySelector("#done .big"); if (big) big.textContent = "Заявка отправлена";
+      ["sCal", "s1", "s2", "s3", "s4", "modes"].forEach(id => $(id).hidden = true); $("done").hidden = false;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) {
+      setStatus(error.message, "err");
+      button.disabled = false;
+    }
+    return;
+  }
   setStatus("");
   $("doneText").innerHTML = `${summaryText()}<br>Мастер: ${esc(prof.master.trim())}, ${esc(fmtPhone(prof.phone))}<br>Вы: ${esc($("cName").value.trim())}, ${esc(fmtPhone($("cPhone").value))}`;
   Kit.addVisit($("cName").value, $("cPhone").value, sel.svcs.map(i => SVCS[i].name), sel.day);
@@ -350,11 +396,40 @@ $("send").addEventListener("click", () => {
 });
 $("again").addEventListener("click", () => {
   $("cName").value = ""; $("cPhone").value = ""; $("cNote").value = ""; $("cAgree").checked = false;
+  $("send").disabled = false;
   ["s1", "s3", "s4", "modes"].forEach(id => $(id).hidden = false); $("done").hidden = true;
   applyMode();
 });
 
-buildHeader(); applyMode();
+async function init() {
+  if (PUBLIC) {
+    try {
+      const response = await fetch(API_URL + "/api/booking/public/" + encodeURIComponent(PUBLIC));
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Страница записи не найдена или снята с публикации.");
+      prof = data.profile || prof;
+      price = data.price || {};
+      win = data.windows || {};
+      $("demo").hidden = true;
+    } catch (error) {
+      $("demo").hidden = false;
+      $("demo").textContent = error.message === "Failed to fetch" ? "Не удалось загрузить страницу записи. Проверьте интернет и обновите страницу." : error.message;
+      $("modes").hidden = true;
+      ["s1", "s2", "sCal", "s3", "s4", "done"].forEach(id => $(id).hidden = true);
+      return;
+    }
+  }
+  SVCS = svcsFromPrice(!PUBLIC);
+  WIN = windowsByDay(!PUBLIC);
+  calMonth = (Object.keys(WIN).sort()[0] || today).slice(0, 7);
+  if (PUBLIC && !SVCS.length) {
+    $("modes").hidden = true;
+    ["s1", "s2", "sCal", "s3", "s4", "done"].forEach(id => $(id).hidden = true);
+  }
+  buildHeader();
+  applyMode();
+}
+init();
 </script>
 </body>
 </html>
