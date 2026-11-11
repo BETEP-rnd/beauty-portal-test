@@ -36,6 +36,11 @@
   .requests .request:first-child { border-top: 0; padding-top: 0; }
   .requests .request span { color: var(--muted); }
 
+  .blacklist-add { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: 10px; }
+  .blacklist-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
+  .blacklist-row:first-child { border-top: 0; padding-top: 0; }
+  .blacklist-row button { border: 0; background: none; color: var(--accent); font: inherit; font-size: 12px; cursor: pointer; padding: 0; }
+
   @media (min-width: 421px) { .me .socin { grid-template-columns: 128px minmax(0, 1fr) auto; } }
   .me .check input { width: 18px; height: 18px; }
   .me input[type="text"], .me input[type="tel"], .me input[type="url"], .me input[type="email"] { font-size: 17px; }
@@ -79,6 +84,16 @@
       <div class="card requests" id="requestsCard" hidden>
         <b>Заявки на запись</b>
         <div id="requestsList"></div>
+      </div>
+      <div class="card blacklist" id="blacklistCard">
+        <b>Чёрный список</b>
+        <span>Номера, которые не могут оставить заявку.</span>
+        <div class="blacklist-add">
+          <input id="blockPhone" type="tel" inputmode="tel" maxlength="18" placeholder="+7 (999) 999-99-99">
+          <button class="btn" id="blockBtn" type="button">Заблокировать</button>
+        </div>
+        <div class="hint" id="blockStatus"></div>
+        <div id="blacklistList"></div>
       </div>
     </div>
     <div class="panel me" id="me"></div>
@@ -189,6 +204,31 @@ async function loadRequests() {
   } catch (error) {}
 }
 loadRequests();
+const blockPhone = $("blockPhone"), blockBtn = $("blockBtn"), blockStatus = $("blockStatus"), blacklistList = $("blacklistList");
+blockPhone.addEventListener("input", e => { e.target.value = Kit.maskPhone(e.target.value, (e.inputType || "").startsWith("delete")); });
+function renderBlacklist(phones) {
+  blacklistList.innerHTML = (phones || []).map(p => `<div class="blacklist-row"><span>${Kit.esc(Kit.fmtPhone(p.phone) || p.phone)}</span><button type="button" data-unblock="${Kit.esc(p.phone)}">Разблокировать</button></div>`).join("");
+}
+async function blacklistAction(phone, action) {
+  if (!signedIn) { blockStatus.textContent = "Сначала войдите в аккаунт."; return; }
+  try {
+    const response = await fetch(API_URL + "/api/booking/blacklist", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone, action }) });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Не удалось сохранить.");
+    blockStatus.textContent = action === "add" ? "Номер заблокирован." : "Номер разблокирован.";
+    renderBlacklist(result.phones);
+  } catch (error) { blockStatus.textContent = error.message; }
+}
+blockBtn.addEventListener("click", () => {
+  if (!Kit.normPhone(blockPhone.value)) { blockStatus.textContent = "Укажите номер полностью."; return; }
+  blacklistAction(blockPhone.value, "add");
+});
+blacklistList.addEventListener("click", e => { const b = e.target.closest("[data-unblock]"); if (b) blacklistAction(b.dataset.unblock, "remove"); });
+async function loadBlacklist() {
+  if (!signedIn) return;
+  try { const response = await fetch(API_URL + "/api/booking/blacklist", { credentials: "include" }); if (!response.ok) return; const data = await response.json(); renderBlacklist(data.phones); } catch (error) {}
+}
+loadBlacklist();
 if (params.get("yandex") === "ok") {
   const note = document.getElementById("ynote");
   note.hidden = false;

@@ -700,7 +700,7 @@ async function processTelegramUpdate(update) {
          SET status = $1, confirmed_at = CASE WHEN $1 = 'confirmed' THEN now() ELSE r.confirmed_at END,
              declined_at = CASE WHEN $1 = 'declined' THEN now() ELSE r.declined_at END
          FROM telegram_links l
-         WHERE r.id = $2 AND r.master_id = l.master_id AND l.chat_id = $3 AND r.status = 'pending'
+         WHERE r.id = $2 AND r.master_id = l.master_id AND l.chat_id = $3 AND r.status = 'pending' AND r.hold_until > now()
          RETURNING r.client_chat_id, r.services, r.day, r.time`,
         [status, match[1], callback.from.id]
       );
@@ -863,11 +863,13 @@ async function bookingRequest(req, res) {
   const found = await pool.query("SELECT master_id, data FROM booking_profiles WHERE slug = $1", [slug]);
   if (!found.rows.length) throw new HttpError(404, "Страница записи не найдена или снята с публикации.");
   const row = found.rows[0];
+  const blocked = await pool.query("SELECT 1 FROM booking_blacklist WHERE master_id = $1 AND phone = $2", [row.master_id, phone]);
+  if (blocked.rows.length) throw new HttpError(403, "Мастер не принимает заявки с этого номера.");
   await pool.query("UPDATE booking_requests SET status = 'expired' WHERE status = 'pending' AND hold_until < now()");
   const active = await pool.query("SELECT 1 FROM booking_requests WHERE master_id = $1 AND phone = $2 AND status = 'pending'", [row.master_id, phone]);
   if (active.rows.length) throw new HttpError(409, "У вас уже есть активная заявка к этому мастеру. Дождитесь ответа.");
   const recent = await pool.query("SELECT count(*)::int AS n FROM booking_requests WHERE master_id = $1 AND phone = $2 AND created_at > now() - interval '24 hours'", [row.master_id, phone]);
-  if (recent.rows[0].n >= 3) throw new HttpError(429, "Слишком много заявок с этого номера. Попробуйте завтра.");
+  if (recent.rows[0].n >= 2) throw new HttpError(429, "Слишком много заявок с этого номера. Попробуйте завтра.");
   const client = await pool.query("SELECT chat_id FROM telegram_clients WHERE phone = $1", [phone]);
   const clientChatId = client.rows[0]?.chat_id || null;
   const free = row.data && row.data.windows && row.data.windows.free;
@@ -909,6 +911,28 @@ async function bookingRequests(req, res) {
     [master.id]
   );
   json(res, 200, { requests: result.rows });
+}
+
+async function bookingBlacklistList(masterId) {
+  const result = await pool.query("SELECT phone, reason, created_at FROM booking_blacklist WHERE master_id = $1 ORDER BY created_at DESC", [masterId]);
+  return result.rows;
+}
+
+async function bookingBlacklistGet(req, res) {
+  const master = await requireMaster(req);
+  json(res, 200, { phones: await bookingBlacklistList(master.id) });
+}
+
+async function bookingBlacklistSet(req, res) {
+  const master = await requireMaster(req);
+  const data = await body(req);
+  const phone = normalizePhone(data.phone);
+  if (data.action === "remove") {
+    await pool.query("DELETE FROM booking_blacklist WHERE master_id = $1 AND phone = $2", [master.id, phone]);
+  } else {
+    await pool.query("INSERT INTO booking_blacklist (master_id, phone, reason) VALUES ($1, $2, $3) ON CONFLICT (master_id, phone) DO NOTHING", [master.id, phone, String(data.reason || "").trim().slice(0, 200)]);
+  }
+  json(res, 200, { phones: await bookingBlacklistList(master.id) });
 }
 
 async function handle(req, res) {
@@ -968,6 +992,8 @@ async function handle(req, res) {
   if (url.pathname.startsWith("/api/booking/public/") && req.method === "GET") { rateLimit(req, "booking-public"); return await bookingPublic(req, res, url.pathname.slice("/api/booking/public/".length)); }
   if (url.pathname === "/api/booking/request" && req.method === "POST") { rateLimit(req, "booking-request"); return await bookingRequest(req, res); }
   if (url.pathname === "/api/booking/requests" && req.method === "GET") return await bookingRequests(req, res);
+  if (url.pathname === "/api/booking/blacklist" && req.method === "GET") return await bookingBlacklistGet(req, res);
+  if (url.pathname === "/api/booking/blacklist" && req.method === "POST") { rateLimit(req, "booking-blacklist"); return await bookingBlacklistSet(req, res); }
   throw new HttpError(404, "Адрес не найден.");
 }
 
