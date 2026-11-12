@@ -907,10 +907,59 @@ async function bookingRequests(req, res) {
   const master = await requireMaster(req);
   await pool.query("UPDATE booking_requests SET status = 'expired' WHERE master_id = $1 AND status = 'pending' AND hold_until < now()", [master.id]);
   const result = await pool.query(
-    "SELECT id, name, phone, services, to_char(day, 'YYYY-MM-DD') AS day, time, comment, status, created_at FROM booking_requests WHERE master_id = $1 ORDER BY created_at DESC LIMIT 30",
+    "SELECT id, name, phone, services, to_char(day, 'YYYY-MM-DD') AS day, time, comment, status, source, created_at FROM booking_requests WHERE master_id = $1 ORDER BY created_at DESC LIMIT 200",
     [master.id]
   );
   json(res, 200, { requests: result.rows });
+}
+
+async function bookingStatus(req, res) {
+  const master = await requireMaster(req);
+  const data = await body(req);
+  const id = String(data.id || "");
+  const status = data.status === "confirmed" ? "confirmed" : data.status === "declined" ? "declined" : "";
+  if (!/^[0-9a-f-]{36}$/i.test(id) || !status) throw new HttpError(400, "Некорректный статус заявки.");
+  const result = await pool.query(
+    `UPDATE booking_requests SET status = $1, confirmed_at = CASE WHEN $1 = 'confirmed' THEN now() ELSE confirmed_at END, declined_at = CASE WHEN $1 = 'declined' THEN now() ELSE declined_at END WHERE id = $2 AND master_id = $3 AND status = 'pending' AND hold_until > now() RETURNING client_chat_id, services, day, time`,
+    [status, id, master.id]
+  );
+  if (!result.rows.length) throw new HttpError(409, "Заявка уже обработана или истекла.");
+  const row = result.rows[0];
+  if (row.client_chat_id) {
+    const list = Array.isArray(row.services) ? row.services.join(", ") : "";
+    const text = status === "confirmed"
+      ? `Мастер подтвердил запись.\n\n${list}\n${ruDay(row.day)} в ${row.time}\n\nЖдём вас!`
+      : `Мастер не сможет принять запись.\n\n${list}\n${ruDay(row.day)} в ${row.time}\n\nВыберите другое время.`;
+    try { await telegramApi("sendMessage", { chat_id: row.client_chat_id, text }); } catch (error) {}
+  }
+  json(res, 200, { ok: true, status });
+}
+
+async function bookingManual(req, res) {
+  const master = await requireMaster(req);
+  const data = await body(req);
+  const name = String(data.name || "").trim().replace(/\s+/g, " ");
+  if (name.length < 2 || name.length > 60) throw new HttpError(400, "Укажите имя клиента.");
+  const phone = normalizePhone(data.phone);
+  const services = Array.isArray(data.services) ? data.services.map(s => String(s || "").trim()).filter(Boolean).slice(0, 5) : [];
+  if (!services.length) throw new HttpError(400, "Укажите услугу.");
+  const day = String(data.day || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new HttpError(400, "Выберите дату.");
+  const time = String(data.time || "");
+  if (!/^\d{2}:\d{2}$/.test(time)) throw new HttpError(400, "Выберите время.");
+  const comment = String(data.comment || "").trim().slice(0, 300);
+  const client = await pool.query("SELECT chat_id FROM telegram_clients WHERE phone = $1", [phone]);
+  const clientChatId = client.rows[0]?.chat_id || null;
+  const result = await pool.query(
+    "INSERT INTO booking_requests (master_id, name, phone, services, day, time, comment, client_chat_id, source, status, confirmed_at) VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, 'manual', 'confirmed', now()) RETURNING id",
+    [master.id, name, phone, JSON.stringify(services), day, time, comment, clientChatId]
+  );
+  if (clientChatId) {
+    try {
+      await telegramApi("sendMessage", { chat_id: clientChatId, text: `Мастер добавил запись:\n${services.join(", ")}\n${ruDay(day)} в ${time}` });
+    } catch (error) {}
+  }
+  json(res, 201, { ok: true, id: result.rows[0].id });
 }
 
 async function bookingBlacklistList(masterId) {
@@ -994,6 +1043,8 @@ async function handle(req, res) {
   if (url.pathname === "/api/booking/requests" && req.method === "GET") return await bookingRequests(req, res);
   if (url.pathname === "/api/booking/blacklist" && req.method === "GET") return await bookingBlacklistGet(req, res);
   if (url.pathname === "/api/booking/blacklist" && req.method === "POST") { rateLimit(req, "booking-blacklist"); return await bookingBlacklistSet(req, res); }
+  if (url.pathname === "/api/booking/status" && req.method === "POST") { rateLimit(req, "booking-status"); return await bookingStatus(req, res); }
+  if (url.pathname === "/api/booking/manual" && req.method === "POST") { rateLimit(req, "booking-manual"); return await bookingManual(req, res); }
   throw new HttpError(404, "Адрес не найден.");
 }
 
