@@ -375,6 +375,7 @@ $("send").addEventListener("click", async () => {
           day: sel.day,
           time: hm(sel.time),
           comment: $("cNote").value.trim(),
+          duration: total().dur,
           consent: true
         })
       });

@@ -9,58 +9,117 @@
 <link rel="stylesheet" href="../kit/kit.css?v=202611110807">
 <script>try { var u = localStorage.getItem("beauty.ui"); if (u) document.documentElement.dataset.ui = u; } catch (e) {}</script>
 <style>
-  .sched { display: flex; flex-direction: column; gap: 18px; }
-  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-  .stat { display: flex; flex-direction: column; gap: 5px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+  .sched { display: flex; flex-direction: column; gap: 14px; }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .stat { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
   .stat span { color: var(--muted); font-size: 12px; line-height: 1.35; }
-  .stat b { color: var(--accent); font-family: var(--display); font-size: 32px; font-weight: 600; line-height: 1; }
-  .controls { padding: 16px 18px; gap: 12px; }
-  .controls-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .stat b { color: var(--accent); font-family: var(--display); font-size: 28px; font-weight: 600; line-height: 1; }
+  .daybar { padding: 14px 16px; gap: 12px; }
+  .daynav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .daynav .title { margin-right: auto; font-family: var(--display); font-size: 24px; font-weight: 600; line-height: 1.05; }
+  .daynav .icon { height: 34px; min-width: 34px; font-size: 16px; }
+  .views { display: flex; overflow: hidden; border: 1px solid var(--line); border-radius: 99px; }
+  .views button { border: 0; background: var(--field); color: var(--text); padding: 7px 12px; font: inherit; font-size: 12.5px; cursor: pointer; }
+  .views button + button { border-left: 1px solid var(--line); }
+  .views button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  .week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .week button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 4px 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--text); font: inherit; cursor: pointer; }
+  .week button .w { color: var(--muted); font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .week button .d { font-size: 17px; font-weight: 600; line-height: 1.1; }
+  .week button .n { color: var(--accent); font-size: 9px; font-weight: 700; line-height: 1; }
+  .week button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+  .week button[aria-pressed="true"] .w, .week button[aria-pressed="true"] .n { color: inherit; opacity: .85; }
+  .week button.today:not([aria-pressed="true"]) { border-color: var(--accent); }
   .filters { display: flex; gap: 6px; flex-wrap: wrap; }
-  .filters button { border: 1px solid var(--line); border-radius: 99px; background: var(--field); color: var(--text); font: inherit; font-size: 13px; padding: 7px 12px; cursor: pointer; }
+  .filters button { border: 1px solid var(--line); border-radius: 99px; background: var(--field); color: var(--text); font: inherit; font-size: 12.5px; padding: 6px 11px; cursor: pointer; }
   .filters button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-  .manual { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; padding-top: 14px; border-top: 1px solid var(--line); }
-  .manual .wide { grid-column: 1 / -1; }
-  .manual .actions { grid-column: 1 / -1; display: flex; gap: 8px; }
-  .sched-list { display: flex; flex-direction: column; gap: 20px; }
-  .day { display: flex; flex-direction: column; gap: 8px; }
-  .day h2 { display: flex; align-items: center; gap: 10px; margin: 0; font-family: var(--display); font-size: 24px; font-weight: 600; line-height: 1.1; }
-  .day h2 .today { padding: 4px 7px; border-radius: 99px; background: var(--accent); color: var(--accent-ink); font-family: var(--ui); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
-  .appt { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 4px 14px; align-items: start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
-  .appt.pending { border-color: var(--accent); }
-  .appt.declined, .appt.expired { opacity: .7; }
-  .appt .time { font-size: 15px; font-weight: 600; }
-  .appt .who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-  .appt .who b { font-size: 14px; }
-  .appt .who a { width: max-content; color: var(--accent); font-size: 13px; text-decoration: none; }
-  .appt .who span { color: var(--muted); font-size: 13px; line-height: 1.4; }
-  .appt .who em { color: var(--muted); font-size: 12.5px; font-style: normal; line-height: 1.4; }
-  .badges { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
-  .badge { border: 1px solid var(--line); border-radius: 99px; padding: 4px 7px; color: var(--muted); font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+  .timeline-panel { padding: 0; overflow: hidden; }
+  .timeline-head { display: grid; grid-template-columns: 64px minmax(0, 1fr); border-bottom: 1px solid var(--line); background: var(--panel); }
+  .timeline-head span, .timeline-head b { padding: 9px 12px; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+  .timeline-head b { color: var(--accent); }
+  .timeline-scroll { overflow-x: auto; }
+  .timeline { display: grid; grid-template-columns: 64px minmax(0, 1fr); min-width: 0; }
+  .times { position: relative; border-right: 1px solid var(--line); background: var(--panel); }
+  .times span { position: absolute; right: 8px; transform: translateY(-50%); color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+  .times span:first-child { transform: none; }
+  .times span:last-child { transform: translateY(-100%); }
+  .master-col { position: relative; min-height: 520px; cursor: crosshair; background-color: var(--panel); background-image: repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px 64px), repeating-linear-gradient(to bottom, color-mix(in srgb, var(--line) 45%, transparent) 0 1px, transparent 1px 32px); }
+  .free-layer { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+  .free-layer .free { position: absolute; left: 0; right: 0; background: color-mix(in srgb, var(--ok) 8%, transparent); border-left: 2px solid color-mix(in srgb, var(--ok) 45%, transparent); }
+  .appts { position: absolute; inset: 0; z-index: 2; }
+  .appt-block { position: absolute; display: flex; flex-direction: column; gap: 1px; overflow: hidden; padding: 5px 7px; border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); font: inherit; text-align: left; cursor: pointer; box-shadow: 0 2px 6px rgba(40, 25, 15, .06); }
+  .appt-block.pending { border-color: var(--accent); border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+  .appt-block.confirmed { border-color: color-mix(in srgb, var(--ok) 55%, var(--line)); border-left-color: var(--ok); background: color-mix(in srgb, var(--ok) 8%, var(--panel)); }
+  .appt-block.manual { border-left-color: var(--muted); }
+  .appt-block.declined, .appt-block.expired { opacity: .55; }
+  .appt-block .t { color: var(--muted); font-size: 9.5px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .appt-block b { overflow: hidden; font-size: 12px; font-weight: 600; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+  .appt-block .s { overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; }
+  .appt-block .src { position: absolute; top: 4px; right: 6px; color: var(--accent); font-size: 7.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+  .appt-block.manual .src { color: var(--muted); }
+  .now-line { position: absolute; left: 0; right: 0; z-index: 4; height: 1px; background: var(--accent); pointer-events: none; }
+  .now-line::before { content: ""; position: absolute; left: 0; top: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  .now-line span { position: absolute; right: 3px; top: -8px; padding: 1px 4px; border-radius: 4px; background: var(--accent); color: var(--accent-ink); font-size: 8px; font-weight: 700; }
+  .sched-list { display: flex; flex-direction: column; gap: 18px; }
+  .day { display: flex; flex-direction: column; gap: 7px; }
+  .day h2 { display: flex; align-items: center; gap: 9px; margin: 0; font-family: var(--display); font-size: 23px; font-weight: 600; line-height: 1.1; }
+  .day h2 .today { padding: 3px 7px; border-radius: 99px; background: var(--accent); color: var(--accent-ink); font-family: var(--ui); font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+  .appt-card { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 4px 12px; align-items: start; width: 100%; padding: 11px 13px; border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 11px; background: var(--panel); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+  .appt-card.pending { border-color: var(--accent); border-left-color: var(--accent); }
+  .appt-card.confirmed { border-left-color: var(--ok); }
+  .appt-card.declined, .appt-card.expired { opacity: .65; }
+  .appt-card .time { color: var(--muted); font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .appt-card .who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .appt-card .who b { font-size: 14px; }
+  .appt-card .who span { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+  .appt-card .badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .badge { border: 1px solid var(--line); border-radius: 99px; padding: 3px 6px; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
   .badge.online { color: var(--accent); border-color: var(--accent); }
   .badge.manual { color: var(--muted); border-color: var(--line); }
   .badge.pending { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
   .badge.confirmed { color: var(--ok); border-color: var(--ok); }
   .badge.declined, .badge.expired { color: var(--muted); }
-  .appt .actions { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
-  .appt .actions .btn { padding: 7px 12px; font-size: 12px; }
-  .empty { padding: 26px 12px; text-align: center; }
+  .empty { padding: 24px 12px; text-align: center; }
+  .status { min-height: 0; }
+  .modal-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(22, 13, 17, .55); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+  .modal { position: relative; width: min(560px, 100%); max-height: 90vh; overflow: auto; padding: 20px 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); color: var(--text); box-shadow: 0 24px 70px rgba(0, 0, 0, .35); }
+  .modal h2 { margin: 0 0 4px; font-family: var(--display); font-size: 28px; font-weight: 600; }
+  .modal-close { position: absolute; top: 8px; right: 10px; border: 0; background: none; color: var(--muted); font-size: 24px; line-height: 1; cursor: pointer; padding: 4px; }
+  .detail-head { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .detail-row { display: flex; justify-content: space-between; gap: 14px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
+  .detail-row span { color: var(--muted); }
+  .detail-row b { text-align: right; font-weight: 500; }
+  .detail-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .manual { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+  .manual .wide { grid-column: 1 / -1; }
+  .manual .actions { grid-column: 1 / -1; display: flex; gap: 8px; }
   @media (max-width: 760px) {
     .stats { grid-template-columns: 1fr 1fr; }
-    .controls { padding: 14px; }
-    .appt { grid-template-columns: 52px minmax(0, 1fr); }
-    .badges { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; }
+    .daynav .title { font-size: 21px; }
+    .daynav .views { order: 3; }
+    .week { gap: 4px; }
+    .week button { padding: 6px 2px; }
+    .week button .d { font-size: 15px; }
+    .appt-card { grid-template-columns: 52px minmax(0, 1fr); }
+    .appt-card .badges { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; justify-content: flex-start; }
   }
   @media (max-width: 520px) {
-    .stats { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    .stat { padding: 9px 10px; }
+    .stat span { font-size: 10.5px; }
+    .stat b { font-size: 22px; }
+    .daybar { padding: 12px; }
+    .week button .w { font-size: 8.5px; }
+    .week button .d { font-size: 14px; }
+    .timeline-head, .timeline { grid-template-columns: 52px minmax(0, 1fr); }
+    .times span { right: 5px; font-size: 9.5px; }
+    .appt-block { padding: 4px 5px; }
+    .appt-block .src { display: none; }
     .manual { grid-template-columns: 1fr; }
     .manual .wide, .manual .actions { grid-column: auto; }
-    .day h2 { font-size: 21px; }
-    .appt { grid-template-columns: 1fr; gap: 3px; }
-    .appt .time { color: var(--muted); font-size: 13px; }
-    .appt .actions .btn { flex: 1 1 auto; }
-    .controls-row { flex-direction: column; align-items: stretch; }
-    #addBtn { width: 100%; }
+    .modal { padding: 18px 16px; }
+    .detail-row { flex-direction: column; gap: 2px; }
+    .detail-row b { text-align: left; }
   }
 </style>
 </head>
@@ -80,33 +139,73 @@
       <div class="stat"><span>На неделе</span><b id="statWeek">0</b></div>
     </section>
 
-    <section class="panel controls" id="controls">
-      <div class="controls-row">
-        <div class="filters" id="filters" role="group" aria-label="Фильтр записей">
-          <button type="button" data-f="upcoming" aria-pressed="true">Предстоящие</button>
-          <button type="button" data-f="all" aria-pressed="false">Все</button>
-          <button type="button" data-f="pending" aria-pressed="false">Ожидают</button>
-          <button type="button" data-f="online" aria-pressed="false">Онлайн</button>
-          <button type="button" data-f="manual" aria-pressed="false">Вручную</button>
+    <section class="panel daybar" id="daybar">
+      <div class="daynav">
+        <button class="icon" type="button" id="prevDay" aria-label="Предыдущий день">‹</button>
+        <b class="title" id="dayTitle">Сегодня</b>
+        <button class="icon" type="button" id="nextDay" aria-label="Следующий день">›</button>
+        <button class="btn ghost" type="button" id="todayBtn">Сегодня</button>
+        <div class="views" id="views" role="group" aria-label="Вид">
+          <button type="button" data-v="day" aria-pressed="true">День</button>
+          <button type="button" data-v="list" aria-pressed="false">Список</button>
         </div>
-        <button class="btn" type="button" id="addBtn">+ Добавить запись</button>
+        <button class="btn" type="button" id="addBtn">+ Запись</button>
+      </div>
+      <div class="week" id="week"></div>
+      <div class="filters" id="filters" role="group" aria-label="Фильтр записей">
+        <button type="button" data-f="upcoming" aria-pressed="false">Предстоящие</button>
+        <button type="button" data-f="all" aria-pressed="true">Все</button>
+        <button type="button" data-f="pending" aria-pressed="false">Ожидают</button>
+        <button type="button" data-f="online" aria-pressed="false">Онлайн</button>
+        <button type="button" data-f="manual" aria-pressed="false">Вручную</button>
       </div>
       <div class="status" id="status" role="status"></div>
-      <form class="manual" id="manual" hidden>
-        <div class="field wide"><label for="mClient">Клиент из базы</label><select id="mClient"><option value="">Новый клиент</option></select></div>
-        <div class="field"><label for="mName" class="req">Имя</label><input id="mName" type="text" maxlength="60" autocomplete="name" placeholder="Например, Анна Смирнова" required></div>
-        <div class="field"><label for="mPhone" class="req">Телефон</label><input id="mPhone" type="tel" inputmode="tel" maxlength="18" autocomplete="tel" placeholder="+7 (999) 999-99-99" required></div>
-        <div class="field"><label for="mDate" class="req">Дата</label><input id="mDate" type="date" required></div>
-        <div class="field"><label for="mTime" class="req">Время</label><input id="mTime" type="time" step="900" required></div>
-        <div class="field wide"><label for="mServices" class="req">Услуги</label><input id="mServices" type="text" list="mSvc" maxlength="200" placeholder="Через запятую, например: Уголки" required><datalist id="mSvc"></datalist></div>
-        <div class="field wide"><label for="mNote">Комментарий</label><textarea id="mNote" maxlength="300" placeholder="Пожелания, особенности, заметка"></textarea></div>
-        <div class="actions"><button class="btn" type="submit" id="mSave">Добавить</button><button class="btn ghost" type="button" id="mCancel">Отмена</button></div>
-      </form>
     </section>
 
-    <div class="sched-list" id="list"></div>
-    <div class="empty hint" id="empty" hidden></div>
+    <section class="panel timeline-panel" id="dayView">
+      <div class="timeline-head"><span>Время</span><b id="masterName">Мастер</b></div>
+      <div class="timeline-scroll">
+        <div class="timeline">
+          <div class="times" id="times"></div>
+          <div class="master-col" id="masterCol">
+            <div class="free-layer" id="freeLayer"></div>
+            <div class="appts" id="appts"></div>
+            <div class="now-line" id="nowLine" hidden><span>сейчас</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div id="listView" hidden>
+      <div class="sched-list" id="list"></div>
+      <div class="empty hint" id="empty" hidden></div>
+    </div>
   </main>
+</div>
+
+<div class="modal-overlay" id="detailOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Запись">
+    <button class="modal-close" type="button" id="closeDetail" aria-label="Закрыть">×</button>
+    <div id="detail"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="manualOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Новая запись">
+    <button class="modal-close" type="button" id="closeManual" aria-label="Закрыть">×</button>
+    <h2>Новая запись</h2>
+    <form class="manual" id="manual">
+      <div class="field wide"><label for="mClient">Клиент из базы</label><select id="mClient"><option value="">Новый клиент</option></select></div>
+      <div class="field"><label for="mName" class="req">Имя</label><input id="mName" type="text" maxlength="60" autocomplete="name" placeholder="Например, Анна Смирнова" required></div>
+      <div class="field"><label for="mPhone" class="req">Телефон</label><input id="mPhone" type="tel" inputmode="tel" maxlength="18" autocomplete="tel" placeholder="+7 (999) 999-99-99" required></div>
+      <div class="field"><label for="mDate" class="req">Дата</label><input id="mDate" type="date" required></div>
+      <div class="field"><label for="mTime" class="req">Время</label><input id="mTime" type="time" step="900" required></div>
+      <div class="field"><label for="mDuration" class="req">Длительность</label><select id="mDuration"><option value="30">30 минут</option><option value="60">1 час</option><option value="90" selected>1,5 часа</option><option value="120">2 часа</option><option value="150">2,5 часа</option><option value="180">3 часа</option><option value="240">4 часа</option></select></div>
+      <div class="field"><label for="mServices" class="req">Услуги</label><input id="mServices" type="text" list="mSvc" maxlength="200" placeholder="Через запятую, например: Уголки" required><datalist id="mSvc"></datalist></div>
+      <div class="field wide"><label for="mNote">Комментарий</label><textarea id="mNote" maxlength="300" placeholder="Пожелания, особенности, заметка"></textarea></div>
+      <div class="actions"><button class="btn" type="submit" id="mSave">Добавить</button><button class="btn ghost" type="button" id="mCancel">Отмена</button></div>
+    </form>
+  </div>
 </div>
 
 <script src="../kit/backgrounds.js?v=202611110807"></script>
@@ -115,23 +214,38 @@
 <script>
 const API_URL = "https://api.masterfolio.ru";
 const $ = id => document.getElementById(id);
+window.addEventListener("error", event => { const box = document.getElementById("status"); if (box) { box.textContent = "Ошибка: " + (event.message || "неизвестно"); box.className = "status err"; } });
 const { esc, fmtPhone, maskPhone, normPhone } = Kit;
 const pad = n => String(n).padStart(2, "0");
 const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const today = iso(new Date());
 const weekEnd = (() => { const d = new Date(); d.setDate(d.getDate() + 7); return iso(d); })();
 const addDays = (day, n) => { const d = new Date(day + "T00:00:00"); d.setDate(d.getDate() + n); return iso(d); };
+const weekStart = day => { const d = new Date(day + "T00:00:00"); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return iso(d); };
+const timeToMin = value => { const [h, m] = String(value || "0:0").split(":").map(Number); return (h || 0) * 60 + (m || 0); };
+const minToTime = value => `${pad(Math.floor(value / 60))}:${pad(value % 60)}`;
+const durationOf = r => Math.max(15, Math.min(600, Number(r.duration) || 60));
 const MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
 const DOW = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
+const DOW_SHORT = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+const HOUR_H = 64;
 const DEMO = new URLSearchParams(location.search).has("demo");
-let requests = [], filter = "upcoming", signedIn = false;
+let requests = [], selectedDate = today, view = "day", filter = "all", signedIn = false;
+let freeWindows = {}, baseStart = 8 * 60, baseEnd = 22 * 60, viewStart = 8 * 60, viewEnd = 22 * 60;
+let masterName = "Мастер";
 
 const demoRequests = () => [
-  { id: "demo-1", name: "Анна Смирнова", phone: "+79000000001", services: ["Объём 1,5D–2D"], day: today, time: "14:00", comment: "", status: "pending", source: "online" },
-  { id: "demo-2", name: "Мария Козлова", phone: "+79000000002", services: ["Уголки", "Снятие ресниц"], day: today, time: "17:30", comment: "Первый раз, нужна консультация.", status: "confirmed", source: "online" },
-  { id: "demo-3", name: "Екатерина Волкова", phone: "+79000000003", services: ["Объём 2,5D–3D"], day: addDays(today, 2), time: "11:00", comment: "", status: "confirmed", source: "manual" },
-  { id: "demo-4", name: "Ольга Новикова", phone: "+79000000004", services: ["Объём 1D"], day: addDays(today, -1), time: "16:00", comment: "", status: "declined", source: "online" }
+  { id: "demo-1", name: "Анна Смирнова", phone: "+79000000001", services: ["Объём 1,5D–2D"], day: today, time: "14:00", duration: 120, comment: "", status: "pending", source: "online" },
+  { id: "demo-2", name: "Мария Козлова", phone: "+79000000002", services: ["Уголки", "Снятие ресниц"], day: today, time: "17:30", duration: 90, comment: "Первый раз, нужна консультация.", status: "confirmed", source: "online" },
+  { id: "demo-3", name: "Екатерина Волкова", phone: "+79000000003", services: ["Объём 2,5D–3D"], day: addDays(today, 2), time: "11:00", duration: 150, comment: "", status: "confirmed", source: "manual" },
+  { id: "demo-4", name: "Ольга Новикова", phone: "+79000000004", services: ["Объём 1D"], day: addDays(today, -1), time: "16:00", duration: 60, comment: "", status: "declined", source: "online" }
 ];
+
+const demoFree = {
+  [today]: [[600, 780], [900, 1140]],
+  [addDays(today, 1)]: [[600, 1080]],
+  [addDays(today, 2)]: [[540, 900], [960, 1200]]
+};
 
 function setNote(text, kind) {
   const el = $("status");
@@ -148,50 +262,125 @@ function statusLabel(status) {
   return status === "confirmed" ? "Подтверждена" : status === "declined" ? "Отклонена" : status === "expired" ? "Истекла" : "Ожидает";
 }
 
-function appointment(r) {
+function matchFilter(r) {
+  if (filter === "pending") return r.status === "pending";
+  if (filter === "online") return (r.source || "online") === "online";
+  if (filter === "manual") return r.source === "manual";
+  if (filter === "upcoming") return (r.status === "pending" || r.status === "confirmed") && (view === "day" ? r.day === selectedDate : r.day >= today);
+  return true;
+}
+
+function renderStats() {
+  $("statPending").textContent = requests.filter(r => r.status === "pending").length;
+  $("statToday").textContent = requests.filter(r => r.day === today && (r.status === "pending" || r.status === "confirmed")).length;
+  $("statWeek").textContent = requests.filter(r => r.day >= today && r.day <= weekEnd && (r.status === "pending" || r.status === "confirmed")).length;
+}
+
+function renderWeek() {
+  const start = weekStart(selectedDate);
+  $("week").innerHTML = Array.from({ length: 7 }, (_, i) => {
+    const day = addDays(start, i);
+    const d = new Date(day + "T00:00:00");
+    const count = requests.filter(r => r.day === day && (r.status === "pending" || r.status === "confirmed")).length;
+    return `<button type="button" data-day="${day}" aria-pressed="${day === selectedDate}" class="${day === today ? "today" : ""}">
+      <span class="w">${DOW_SHORT[d.getDay()]}</span><span class="d">${d.getDate()}</span><span class="n">${count || ""}</span>
+    </button>`;
+  }).join("");
+}
+
+function layoutAppointments(list) {
+  const items = list.map(r => ({ r, start: timeToMin(r.time), end: timeToMin(r.time) + durationOf(r), lane: 0 })).sort((a, b) => a.start - b.start);
+  const laneEnds = [];
+  let lanes = 1;
+  items.forEach(item => {
+    let lane = laneEnds.findIndex(end => end <= item.start);
+    if (lane < 0) { lane = laneEnds.length; laneEnds.push(item.end); }
+    else laneEnds[lane] = item.end;
+    item.lane = lane;
+    lanes = Math.max(lanes, laneEnds.length);
+  });
+  return { items, lanes };
+}
+
+function renderDay() {
+  const list = requests.filter(r => r.day === selectedDate && matchFilter(r));
+  const wins = freeWindows[selectedDate] || [];
+  const starts = list.map(r => timeToMin(r.time));
+  const ends = list.map(r => timeToMin(r.time) + durationOf(r));
+  let gs = baseStart, ge = baseEnd;
+  if (starts.length) { gs = Math.min(gs, ...starts); ge = Math.max(ge, ...ends); }
+  gs = Math.floor(gs / 60) * 60;
+  ge = Math.ceil(ge / 60) * 60;
+  viewStart = gs; viewEnd = ge;
+  const height = (ge - gs) / 60 * HOUR_H;
+  $("times").style.height = height + "px";
+  $("masterCol").style.height = height + "px";
+  $("times").innerHTML = Array.from({ length: (ge - gs) / 60 + 1 }, (_, i) => `<span style="top:${i * HOUR_H}px">${minToTime(gs + i * 60)}</span>`).join("");
+  $("freeLayer").innerHTML = wins.map(([s, e]) => {
+    const a = Math.max(s, gs), b = Math.min(e, ge);
+    if (b <= a) return "";
+    return `<div class="free" style="top:${(a - gs) / 60 * HOUR_H}px;height:${(b - a) / 60 * HOUR_H}px"></div>`;
+  }).join("");
+  const { items, lanes } = layoutAppointments(list);
+  $("appts").innerHTML = items.map(({ r, start, end, lane }) => {
+    const top = (start - gs) / 60 * HOUR_H;
+    const h = Math.max(28, (end - start) / 60 * HOUR_H - 2);
+    const width = 100 / lanes;
+    const left = lane * width;
+    const services = Array.isArray(r.services) ? r.services.join(", ") : String(r.services || "");
+    const status = r.status || "pending";
+    const source = r.source === "manual" ? "manual" : "online";
+    return `<button class="appt-block ${status} ${source}" type="button" data-id="${esc(r.id)}" style="top:${top}px;height:${h}px;left:calc(${left}% + 2px);width:calc(${width}% - 4px)" title="${esc(r.name)} · ${esc(services)}">
+      <span class="t">${esc(r.time)}–${minToTime(end)}${status === "pending" ? " · ожидает" : ""}</span>
+      <b>${esc(r.name)}</b>
+      ${h >= 44 ? `<span class="s">${esc(services)}</span>` : ""}
+      <span class="src">${source === "manual" ? "вручную" : "онлайн"}</span>
+    </button>`;
+  }).join("");
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const showNow = selectedDate === today && nowMin >= gs && nowMin <= ge;
+  $("nowLine").hidden = !showNow;
+  if (showNow) $("nowLine").style.top = `${(nowMin - gs) / 60 * HOUR_H}px`;
+}
+
+function listCard(r) {
   const status = r.status || "pending";
   const source = r.source === "manual" ? "manual" : "online";
   const services = Array.isArray(r.services) ? r.services.join(", ") : String(r.services || "");
   const phone = r.phone || "";
-  const actions = status === "pending" && source === "online"
-    ? `<div class="actions"><button class="btn" type="button" data-confirm="${esc(r.id)}">Подтвердить</button><button class="btn ghost" type="button" data-decline="${esc(r.id)}">Отклонить</button></div>`
-    : "";
-  return `<article class="appt ${status}">
-    <div class="time">${esc(r.time || "")}</div>
-    <div class="who"><b>${esc(r.name)}</b>${phone ? `<a href="tel:${esc(phone)}">${esc(fmtPhone(phone) || phone)}</a>` : ""}<span>${esc(services)}</span>${r.comment ? `<em>${esc(r.comment)}</em>` : ""}</div>
-    <div class="badges"><span class="badge ${source}">${source === "manual" ? "Вручную" : "Онлайн-запись"}</span><span class="badge ${status}">${statusLabel(status)}</span></div>
-    ${actions}
-  </article>`;
+  return `<button class="appt-card ${status}" type="button" data-id="${esc(r.id)}">
+    <span class="time">${esc(r.time)}</span>
+    <span class="who"><b>${esc(r.name)}</b><span>${phone ? esc(fmtPhone(phone) || phone) : ""}${phone && services ? " · " : ""}${esc(services)}</span>${r.comment ? `<span>${esc(r.comment)}</span>` : ""}</span>
+    <span class="badges"><span class="badge ${source}">${source === "manual" ? "Вручную" : "Онлайн-запись"}</span><span class="badge ${status}">${statusLabel(status)}</span></span>
+  </button>`;
 }
 
-function render() {
-  const pending = requests.filter(r => r.status === "pending").length;
-  const todayCount = requests.filter(r => r.day === today && (r.status === "pending" || r.status === "confirmed")).length;
-  const weekCount = requests.filter(r => r.day >= today && r.day <= weekEnd && (r.status === "pending" || r.status === "confirmed")).length;
-  $("statPending").textContent = pending;
-  $("statToday").textContent = todayCount;
-  $("statWeek").textContent = weekCount;
-
-  let list = requests.slice();
-  if (filter === "upcoming") list = list.filter(r => r.day >= today && (r.status === "pending" || r.status === "confirmed"));
-  else if (filter === "pending") list = list.filter(r => r.status === "pending");
-  else if (filter === "online") list = list.filter(r => (r.source || "online") === "online");
-  else if (filter === "manual") list = list.filter(r => r.source === "manual");
+function renderList() {
+  let list = requests.filter(r => matchFilter(r));
   list.sort((a, b) => `${a.day} ${a.time}`.localeCompare(`${b.day} ${b.time}`));
-
   const groups = {};
   list.forEach(r => { (groups[r.day] = groups[r.day] || []).push(r); });
-  $("list").innerHTML = Object.keys(groups).sort().map(day => `<section class="day"><h2>${esc(dateLabel(day))}${day === today ? ' <span class="today">Сегодня</span>' : ""}</h2>${groups[day].map(appointment).join("")}</section>`).join("");
-
-  const messages = {
-    upcoming: "Предстоящих записей нет. Можно посмотреть все или добавить запись.",
-    all: "Записей пока нет. Добавьте первую.",
-    pending: "Заявок, ожидающих подтверждения, нет.",
-    online: "Онлайн-записей пока нет.",
-    manual: "Записей, добавленных вручную, пока нет."
-  };
+  $("list").innerHTML = Object.keys(groups).sort().map(day => `<section class="day"><h2>${esc(dateLabel(day))}${day === today ? ' <span class="today">Сегодня</span>' : ""}</h2>${groups[day].map(listCard).join("")}</section>`).join("");
+  const messages = { upcoming: "Предстоящих записей нет.", all: "Записей пока нет. Добавьте первую.", pending: "Заявок, ожидающих подтверждения, нет.", online: "Онлайн-записей пока нет.", manual: "Записей, добавленных вручную, пока нет." };
   $("empty").hidden = list.length > 0;
   $("empty").textContent = messages[filter] || messages.all;
+}
+
+function renderAll() {
+  $("masterName").textContent = masterName;
+  renderStats();
+  renderWeek();
+  $("dayView").hidden = view !== "day";
+  $("listView").hidden = view !== "list";
+  $("dayTitle").hidden = view !== "day";
+  $("prevDay").hidden = view !== "day";
+  $("nextDay").hidden = view !== "day";
+  $("todayBtn").hidden = view !== "day";
+  $("week").hidden = view !== "day";
+  $("dayTitle").textContent = dateLabel(selectedDate);
+  renderDay();
+  renderList();
 }
 
 async function load() {
@@ -201,48 +390,86 @@ async function load() {
     if (!response.ok) throw new Error("Не удалось загрузить записи.");
     const data = await response.json();
     requests = data.requests || [];
-    render();
-  } catch (error) {
-    setNote(error.message, "err");
-  }
+    renderAll();
+  } catch (error) { setNote(error.message, "err"); }
 }
 
 async function changeStatus(id, status) {
   if (DEMO) {
     const row = requests.find(r => r.id === id);
     if (row) row.status = status;
-    render();
+    closeDetail();
+    renderAll();
     setNote(status === "confirmed" ? "Запись подтверждена." : "Заявка отклонена.", "ok");
     return;
   }
   setNote("Сохраняем…");
   try {
-    const response = await fetch(API_URL + "/api/booking/status", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status })
-    });
+    const response = await fetch(API_URL + "/api/booking/status", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || "Не удалось сохранить.");
+    closeDetail();
     await load();
     setNote(status === "confirmed" ? "Запись подтверждена." : "Заявка отклонена.", "ok");
-  } catch (error) {
-    setNote(error.message, "err");
-  }
+  } catch (error) { setNote(error.message, "err"); }
 }
+
+function openDetail(id) {
+  const r = requests.find(item => item.id === id);
+  if (!r) return;
+  const status = r.status || "pending";
+  const source = r.source === "manual" ? "manual" : "online";
+  const services = Array.isArray(r.services) ? r.services.join(", ") : String(r.services || "");
+  const end = minToTime(timeToMin(r.time) + durationOf(r));
+  const actions = status === "pending"
+    ? `<div class="detail-actions"><button class="btn" type="button" data-ok="${esc(r.id)}">Подтвердить</button><button class="btn ghost" type="button" data-no="${esc(r.id)}">Отклонить</button></div>`
+    : "";
+  $("detail").innerHTML = `<div class="detail-head"><span class="badge ${source}">${source === "manual" ? "Вручную" : "Онлайн-запись"}</span><span class="badge ${status}">${statusLabel(status)}</span></div>
+    <h2>${esc(r.name)}</h2>
+    ${r.phone ? `<a href="tel:${esc(r.phone)}" style="color:var(--accent);text-decoration:none;font-size:14px">${esc(fmtPhone(r.phone) || r.phone)}</a>` : ""}
+    <div class="detail-row"><span>Когда</span><b>${esc(dateLabel(r.day))}, ${esc(r.time)}–${end}</b></div>
+    <div class="detail-row"><span>Длительность</span><b>${durationOf(r)} мин</b></div>
+    <div class="detail-row"><span>Услуги</span><b>${esc(services)}</b></div>
+    ${r.comment ? `<div class="detail-row"><span>Комментарий</span><b>${esc(r.comment)}</b></div>` : ""}
+    ${actions}`;
+  $("detailOverlay").hidden = false;
+}
+
+function closeDetail() { $("detailOverlay").hidden = true; }
+
+function openManual(day, time) {
+  $("mClient").value = "";
+  $("mName").value = "";
+  $("mPhone").value = "";
+  $("mServices").value = "";
+  $("mNote").value = "";
+  $("mDate").value = day || selectedDate;
+  $("mTime").value = time || "12:00";
+  $("mDuration").value = "90";
+  $("manualOverlay").hidden = false;
+  setTimeout(() => $("mName").focus(), 50);
+}
+
+function closeManual() { $("manualOverlay").hidden = true; }
 
 function showAuth(text) {
   signedIn = false;
   $("authNote").hidden = false;
   $("authNote").innerHTML = `${esc(text)} <a href="../auth/">Войти</a>`;
   $("stats").hidden = true;
-  $("controls").hidden = true;
-  $("list").innerHTML = "";
-  $("empty").hidden = true;
+  $("daybar").hidden = true;
+  $("dayView").hidden = true;
+  $("listView").hidden = true;
 }
 
-function setupForm() {
+function setup() {
+  const prof = Kit.loadProfile();
+  masterName = String(prof.master || "").trim() || "Мастер";
+  const win = DEMO ? { dayStart: "10:00", dayEnd: "20:00", free: demoFree } : (Kit.loadJSON("windows.v1") || {});
+  freeWindows = win.free || {};
+  baseStart = timeToMin(win.dayStart || "08:00");
+  baseEnd = timeToMin(win.dayEnd || "22:00");
+
   const clients = Kit.loadClients() || [];
   const price = Kit.loadJSON("price.v1") || {};
   $("mClient").innerHTML = '<option value="">Новый клиент</option>' + clients.map((c, i) => `<option value="${i}">${esc(c.name)}${c.phone ? " — " + esc(c.phone) : ""}</option>`).join("");
@@ -255,14 +482,66 @@ function setupForm() {
     $("mPhone").value = c.phone || "";
   });
   $("mSvc").innerHTML = ((price.services || []).map(s => s.name).filter(Boolean)).map(name => `<option value="${esc(name)}">`).join("");
-  $("mDate").value = today;
-  $("mTime").value = "12:00";
   $("mPhone").addEventListener("input", e => { e.target.value = maskPhone(e.target.value, (e.inputType || "").startsWith("delete")); });
-  $("addBtn").addEventListener("click", () => {
-    $("manual").hidden = !$("manual").hidden;
-    if (!$("manual").hidden) $("mName").focus();
+
+  $("week").addEventListener("click", e => {
+    const button = e.target.closest("[data-day]");
+    if (!button) return;
+    selectedDate = button.dataset.day;
+    view = "day";
+    $("views").querySelectorAll("[data-v]").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === "day" ? "true" : "false"));
+    renderAll();
   });
-  $("mCancel").addEventListener("click", () => { $("manual").hidden = true; });
+  $("prevDay").addEventListener("click", () => { selectedDate = addDays(selectedDate, -1); renderAll(); });
+  $("nextDay").addEventListener("click", () => { selectedDate = addDays(selectedDate, 1); renderAll(); });
+  $("todayBtn").addEventListener("click", () => { selectedDate = today; renderAll(); });
+  $("views").addEventListener("click", e => {
+    const button = e.target.closest("[data-v]");
+    if (!button) return;
+    view = button.dataset.v;
+    $("views").querySelectorAll("[data-v]").forEach(b => b.setAttribute("aria-pressed", b === button ? "true" : "false"));
+    renderAll();
+  });
+  $("filters").addEventListener("click", e => {
+    const button = e.target.closest("[data-f]");
+    if (!button) return;
+    filter = button.dataset.f;
+    $("filters").querySelectorAll("[data-f]").forEach(b => b.setAttribute("aria-pressed", b === button ? "true" : "false"));
+    renderAll();
+  });
+  $("addBtn").addEventListener("click", () => openManual(selectedDate, "12:00"));
+  $("closeDetail").addEventListener("click", closeDetail);
+  $("detailOverlay").addEventListener("click", e => { if (e.target === $("detailOverlay")) closeDetail(); });
+  $("closeManual").addEventListener("click", closeManual);
+  $("manualOverlay").addEventListener("click", e => { if (e.target === $("manualOverlay")) closeManual(); });
+  $("mCancel").addEventListener("click", closeManual);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") { closeDetail(); closeManual(); } });
+
+  $("appts").addEventListener("click", e => {
+    const button = e.target.closest("[data-id]");
+    if (!button) return;
+    openDetail(button.dataset.id);
+  });
+  $("list").addEventListener("click", e => {
+    const button = e.target.closest("[data-id]");
+    if (!button) return;
+    openDetail(button.dataset.id);
+  });
+  $("detail").addEventListener("click", e => {
+    const ok = e.target.closest("[data-ok]"), no = e.target.closest("[data-no]");
+    if (ok) changeStatus(ok.dataset.ok, "confirmed");
+    if (no) changeStatus(no.dataset.no, "declined");
+  });
+  $("masterCol").addEventListener("click", e => {
+    if (e.target.closest(".appt-block")) return;
+    const rect = $("masterCol").getBoundingClientRect();
+    const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+    let minutes = viewStart + (y / HOUR_H) * 60;
+    minutes = Math.round(minutes / 30) * 30;
+    minutes = Math.max(viewStart, Math.min(viewEnd - 30, minutes));
+    openManual(selectedDate, minToTime(minutes));
+  });
+
   $("manual").addEventListener("submit", async e => {
     e.preventDefault();
     const name = $("mName").value.trim();
@@ -272,13 +551,14 @@ function setupForm() {
     const services = $("mServices").value.split(",").map(s => s.trim()).filter(Boolean);
     if (!services.length) { setNote("Укажите хотя бы одну услугу.", "err"); return $("mServices").focus(); }
     const day = $("mDate").value, time = $("mTime").value;
+    const duration = Number($("mDuration").value) || 90;
     if (!day || !time) { setNote("Укажите дату и время.", "err"); return; }
     const comment = $("mNote").value.trim();
     if (DEMO) {
-      requests.push({ id: "demo-" + Date.now(), name, phone, services, day, time, comment, status: "confirmed", source: "manual" });
-      $("manual").hidden = true;
-      render();
-      setNote("Запись добавлена.", "ok");
+      requests.push({ id: "demo-" + Date.now(), name, phone, services, day, time, duration, comment, status: "confirmed", source: "manual" });
+      selectedDate = day; view = "day";
+      $("views").querySelectorAll("[data-v]").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === "day" ? "true" : "false"));
+      closeManual(); renderAll(); setNote("Запись добавлена.", "ok");
       return;
     }
     const button = $("mSave");
@@ -289,50 +569,27 @@ function setupForm() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone, services, day, time, comment })
+        body: JSON.stringify({ name, phone, services, day, time, duration, comment })
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || "Не удалось добавить запись.");
-      $("manual").hidden = true;
-      $("mClient").value = "";
-      $("mName").value = "";
-      $("mPhone").value = "";
-      $("mServices").value = "";
-      $("mNote").value = "";
-      $("mDate").value = day;
-      $("mTime").value = time;
+      selectedDate = day; view = "day";
+      $("views").querySelectorAll("[data-v]").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === "day" ? "true" : "false"));
+      closeManual();
       await load();
       setNote("Запись добавлена.", "ok");
-    } catch (error) {
-      setNote(error.message, "err");
-    } finally {
-      button.disabled = false;
-    }
+    } catch (error) { setNote(error.message, "err"); }
+    finally { button.disabled = false; }
   });
 }
 
-$("filters").addEventListener("click", e => {
-  const button = e.target.closest("[data-f]");
-  if (!button) return;
-  filter = button.dataset.f;
-  $("filters").querySelectorAll("[data-f]").forEach(b => b.setAttribute("aria-pressed", b === button ? "true" : "false"));
-  render();
-});
-
-$("list").addEventListener("click", e => {
-  const button = e.target.closest("[data-confirm], [data-decline]");
-  if (!button) return;
-  button.disabled = true;
-  changeStatus(button.dataset.confirm || button.dataset.decline, button.dataset.confirm ? "confirmed" : "declined");
-});
-
 async function init() {
-  setupForm();
+  setup();
   if (DEMO) {
     signedIn = true;
     $("authNote").hidden = true;
     requests = demoRequests();
-    render();
+    renderAll();
     return;
   }
   try {
@@ -341,12 +598,10 @@ async function init() {
     signedIn = true;
     $("authNote").hidden = true;
     await load();
-  } catch (error) {
-    showAuth("Не удалось связаться с сервером. Проверьте интернет.");
-  }
+  } catch (error) { showAuth("Не удалось связаться с сервером. Проверьте интернет."); }
 }
 
-init();
+init().catch(error => { const box = $("status"); if (box) { box.textContent = "Ошибка: " + ((error && error.message) || error); box.className = "status err"; } });
 </script>
 </body>
 </html>

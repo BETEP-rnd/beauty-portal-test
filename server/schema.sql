@@ -158,3 +158,5 @@ CREATE INDEX IF NOT EXISTS booking_blacklist_master_idx ON booking_blacklist (ma
 ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'online';
 ALTER TABLE booking_requests DROP CONSTRAINT IF EXISTS booking_requests_source_check;
 ALTER TABLE booking_requests ADD CONSTRAINT booking_requests_source_check CHECK (source IN ('online', 'manual'));
+
+ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS duration integer NOT NULL DEFAULT 60;
