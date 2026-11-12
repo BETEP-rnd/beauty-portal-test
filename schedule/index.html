@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f8f2ec">
+<title>График работы — Мастерфолио</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500&family=Manrope:wght@400;500;600;700&family=Montserrat:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../kit/kit.css?v=202611110807">
+<script>try { var u = localStorage.getItem("beauty.ui"); if (u) document.documentElement.dataset.ui = u; } catch (e) {}</script>
+<style>
+  .sched { display: flex; flex-direction: column; gap: 18px; }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .stat { display: flex; flex-direction: column; gap: 5px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+  .stat span { color: var(--muted); font-size: 12px; line-height: 1.35; }
+  .stat b { color: var(--accent); font-family: var(--display); font-size: 32px; font-weight: 600; line-height: 1; }
+  .controls { padding: 16px 18px; gap: 12px; }
+  .controls-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; }
+  .filters button { border: 1px solid var(--line); border-radius: 99px; background: var(--field); color: var(--text); font: inherit; font-size: 13px; padding: 7px 12px; cursor: pointer; }
+  .filters button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .manual { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .manual .wide { grid-column: 1 / -1; }
+  .manual .actions { grid-column: 1 / -1; display: flex; gap: 8px; }
+  .sched-list { display: flex; flex-direction: column; gap: 20px; }
+  .day { display: flex; flex-direction: column; gap: 8px; }
+  .day h2 { display: flex; align-items: center; gap: 10px; margin: 0; font-family: var(--display); font-size: 24px; font-weight: 600; line-height: 1.1; }
+  .day h2 .today { padding: 4px 7px; border-radius: 99px; background: var(--accent); color: var(--accent-ink); font-family: var(--ui); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+  .appt { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 4px 14px; align-items: start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+  .appt.pending { border-color: var(--accent); }
+  .appt.declined, .appt.expired { opacity: .7; }
+  .appt .time { font-size: 15px; font-weight: 600; }
+  .appt .who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .appt .who b { font-size: 14px; }
+  .appt .who a { width: max-content; color: var(--accent); font-size: 13px; text-decoration: none; }
+  .appt .who span { color: var(--muted); font-size: 13px; line-height: 1.4; }
+  .appt .who em { color: var(--muted); font-size: 12.5px; font-style: normal; line-height: 1.4; }
+  .badges { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+  .badge { border: 1px solid var(--line); border-radius: 99px; padding: 4px 7px; color: var(--muted); font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+  .badge.online { color: var(--accent); border-color: var(--accent); }
+  .badge.manual { color: var(--muted); border-color: var(--line); }
+  .badge.pending { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .badge.confirmed { color: var(--ok); border-color: var(--ok); }
+  .badge.declined, .badge.expired { color: var(--muted); }
+  .appt .actions { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
+  .appt .actions .btn { padding: 7px 12px; font-size: 12px; }
+  .empty { padding: 26px 12px; text-align: center; }
+  @media (max-width: 760px) {
+    .stats { grid-template-columns: 1fr 1fr; }
+    .controls { padding: 14px; }
+    .appt { grid-template-columns: 52px minmax(0, 1fr); }
+    .badges { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; }
+  }
+  @media (max-width: 520px) {
+    .stats { grid-template-columns: 1fr; }
+    .manual { grid-template-columns: 1fr; }
+    .manual .wide, .manual .actions { grid-column: auto; }
+    .day h2 { font-size: 21px; }
+    .appt { grid-template-columns: 1fr; gap: 3px; }
+    .appt .time { color: var(--muted); font-size: 13px; }
+    .appt .actions .btn { flex: 1 1 auto; }
+    .controls-row { flex-direction: column; align-items: stretch; }
+    #addBtn { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>График работы</h1>
+    <nav><a href="../">Главная</a><a href="../cabinet/">Кабинет</a><a href="../schedule/" aria-current="page">График</a><a href="../price/">Прайс-лист</a><a href="../windows/">Свободные окошки</a><a href="../certs/">Сертификаты</a><a href="../booking/">Онлайн-запись</a><a href="../clients/">Мои клиенты</a></nav>
+  </header>
+
+  <div class="ynote" id="authNote" hidden></div>
+
+  <main class="sched">
+    <section class="stats" id="stats">
+      <div class="stat"><span>Ожидают подтверждения</span><b id="statPending">0</b></div>
+      <div class="stat"><span>Сегодня</span><b id="statToday">0</b></div>
+      <div class="stat"><span>На неделе</span><b id="statWeek">0</b></div>
+    </section>
+
+    <section class="panel controls" id="controls">
+      <div class="controls-row">
+        <div class="filters" id="filters" role="group" aria-label="Фильтр записей">
+          <button type="button" data-f="upcoming" aria-pressed="true">Предстоящие</button>
+          <button type="button" data-f="all" aria-pressed="false">Все</button>
+          <button type="button" data-f="pending" aria-pressed="false">Ожидают</button>
+          <button type="button" data-f="online" aria-pressed="false">Онлайн</button>
+          <button type="button" data-f="manual" aria-pressed="false">Вручную</button>
+        </div>
+        <button class="btn" type="button" id="addBtn">+ Добавить запись</button>
+      </div>
+      <div class="status" id="status" role="status"></div>
+      <form class="manual" id="manual" hidden>
+        <div class="field wide"><label for="mClient">Клиент из базы</label><select id="mClient"><option value="">Новый клиент</option></select></div>
+        <div class="field"><label for="mName" class="req">Имя</label><input id="mName" type="text" maxlength="60" autocomplete="name" placeholder="Например, Анна Смирнова" required></div>
+        <div class="field"><label for="mPhone" class="req">Телефон</label><input id="mPhone" type="tel" inputmode="tel" maxlength="18" autocomplete="tel" placeholder="+7 (999) 999-99-99" required></div>
+        <div class="field"><label for="mDate" class="req">Дата</label><input id="mDate" type="date" required></div>
+        <div class="field"><label for="mTime" class="req">Время</label><input id="mTime" type="time" step="900" required></div>
+        <div class="field wide"><label for="mServices" class="req">Услуги</label><input id="mServices" type="text" list="mSvc" maxlength="200" placeholder="Через запятую, например: Уголки" required><datalist id="mSvc"></datalist></div>
+        <div class="field wide"><label for="mNote">Комментарий</label><textarea id="mNote" maxlength="300" placeholder="Пожелания, особенности, заметка"></textarea></div>
+        <div class="actions"><button class="btn" type="submit" id="mSave">Добавить</button><button class="btn ghost" type="button" id="mCancel">Отмена</button></div>
+      </form>
+    </section>
+
+    <div class="sched-list" id="list"></div>
+    <div class="empty hint" id="empty" hidden></div>
+  </main>
+</div>
+
+<script src="../kit/backgrounds.js?v=202611110807"></script>
+<script src="../kit/trends.js?v=202611110807"></script>
+<script src="../kit/kit.js?v=202611110807"></script>
+<script>
+const API_URL = "https://api.masterfolio.ru";
+const $ = id => document.getElementById(id);
+const { esc, fmtPhone, maskPhone, normPhone } = Kit;
+const pad = n => String(n).padStart(2, "0");
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const today = iso(new Date());
+const weekEnd = (() => { const d = new Date(); d.setDate(d.getDate() + 7); return iso(d); })();
+const addDays = (day, n) => { const d = new Date(day + "T00:00:00"); d.setDate(d.getDate() + n); return iso(d); };
+const MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+const DOW = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
+const DEMO = new URLSearchParams(location.search).has("demo");
+let requests = [], filter = "upcoming", signedIn = false;
+
+const demoRequests = () => [
+  { id: "demo-1", name: "Анна Смирнова", phone: "+79000000001", services: ["Объём 1,5D–2D"], day: today, time: "14:00", comment: "", status: "pending", source: "online" },
+  { id: "demo-2", name: "Мария Козлова", phone: "+79000000002", services: ["Уголки", "Снятие ресниц"], day: today, time: "17:30", comment: "Первый раз, нужна консультация.", status: "confirmed", source: "online" },
+  { id: "demo-3", name: "Екатерина Волкова", phone: "+79000000003", services: ["Объём 2,5D–3D"], day: addDays(today, 2), time: "11:00", comment: "", status: "confirmed", source: "manual" },
+  { id: "demo-4", name: "Ольга Новикова", phone: "+79000000004", services: ["Объём 1D"], day: addDays(today, -1), time: "16:00", comment: "", status: "declined", source: "online" }
+];
+
+function setNote(text, kind) {
+  const el = $("status");
+  el.textContent = text || "";
+  el.className = "status" + (kind ? " " + kind : "");
+}
+
+function dateLabel(day) {
+  const d = new Date(day + "T00:00:00");
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}, ${DOW[d.getDay()]}`;
+}
+
+function statusLabel(status) {
+  return status === "confirmed" ? "Подтверждена" : status === "declined" ? "Отклонена" : status === "expired" ? "Истекла" : "Ожидает";
+}
+
+function appointment(r) {
+  const status = r.status || "pending";
+  const source = r.source === "manual" ? "manual" : "online";
+  const services = Array.isArray(r.services) ? r.services.join(", ") : String(r.services || "");
+  const phone = r.phone || "";
+  const actions = status === "pending" && source === "online"
+    ? `<div class="actions"><button class="btn" type="button" data-confirm="${esc(r.id)}">Подтвердить</button><button class="btn ghost" type="button" data-decline="${esc(r.id)}">Отклонить</button></div>`
+    : "";
+  return `<article class="appt ${status}">
+    <div class="time">${esc(r.time || "")}</div>
+    <div class="who"><b>${esc(r.name)}</b>${phone ? `<a href="tel:${esc(phone)}">${esc(fmtPhone(phone) || phone)}</a>` : ""}<span>${esc(services)}</span>${r.comment ? `<em>${esc(r.comment)}</em>` : ""}</div>
+    <div class="badges"><span class="badge ${source}">${source === "manual" ? "Вручную" : "Онлайн-запись"}</span><span class="badge ${status}">${statusLabel(status)}</span></div>
+    ${actions}
+  </article>`;
+}
+
+function render() {
+  const pending = requests.filter(r => r.status === "pending").length;
+  const todayCount = requests.filter(r => r.day === today && (r.status === "pending" || r.status === "confirmed")).length;
+  const weekCount = requests.filter(r => r.day >= today && r.day <= weekEnd && (r.status === "pending" || r.status === "confirmed")).length;
+  $("statPending").textContent = pending;
+  $("statToday").textContent = todayCount;
+  $("statWeek").textContent = weekCount;
+
+  let list = requests.slice();
+  if (filter === "upcoming") list = list.filter(r => r.day >= today && (r.status === "pending" || r.status === "confirmed"));
+  else if (filter === "pending") list = list.filter(r => r.status === "pending");
+  else if (filter === "online") list = list.filter(r => (r.source || "online") === "online");
+  else if (filter === "manual") list = list.filter(r => r.source === "manual");
+  list.sort((a, b) => `${a.day} ${a.time}`.localeCompare(`${b.day} ${b.time}`));
+
+  const groups = {};
+  list.forEach(r => { (groups[r.day] = groups[r.day] || []).push(r); });
+  $("list").innerHTML = Object.keys(groups).sort().map(day => `<section class="day"><h2>${esc(dateLabel(day))}${day === today ? ' <span class="today">Сегодня</span>' : ""}</h2>${groups[day].map(appointment).join("")}</section>`).join("");
+
+  const messages = {
+    upcoming: "Предстоящих записей нет. Можно посмотреть все или добавить запись.",
+    all: "Записей пока нет. Добавьте первую.",
+    pending: "Заявок, ожидающих подтверждения, нет.",
+    online: "Онлайн-записей пока нет.",
+    manual: "Записей, добавленных вручную, пока нет."
+  };
+  $("empty").hidden = list.length > 0;
+  $("empty").textContent = messages[filter] || messages.all;
+}
+
+async function load() {
+  try {
+    const response = await fetch(API_URL + "/api/booking/requests", { credentials: "include" });
+    if (response.status === 401) { showAuth("Войдите в кабинет, чтобы увидеть график."); return; }
+    if (!response.ok) throw new Error("Не удалось загрузить записи.");
+    const data = await response.json();
+    requests = data.requests || [];
+    render();
+  } catch (error) {
+    setNote(error.message, "err");
+  }
+}
+
+async function changeStatus(id, status) {
+  if (DEMO) {
+    const row = requests.find(r => r.id === id);
+    if (row) row.status = status;
+    render();
+    setNote(status === "confirmed" ? "Запись подтверждена." : "Заявка отклонена.", "ok");
+    return;
+  }
+  setNote("Сохраняем…");
+  try {
+    const response = await fetch(API_URL + "/api/booking/status", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Не удалось сохранить.");
+    await load();
+    setNote(status === "confirmed" ? "Запись подтверждена." : "Заявка отклонена.", "ok");
+  } catch (error) {
+    setNote(error.message, "err");
+  }
+}
+
+function showAuth(text) {
+  signedIn = false;
+  $("authNote").hidden = false;
+  $("authNote").innerHTML = `${esc(text)} <a href="../auth/">Войти</a>`;
+  $("stats").hidden = true;
+  $("controls").hidden = true;
+  $("list").innerHTML = "";
+  $("empty").hidden = true;
+}
+
+function setupForm() {
+  const clients = Kit.loadClients() || [];
+  const price = Kit.loadJSON("price.v1") || {};
+  $("mClient").innerHTML = '<option value="">Новый клиент</option>' + clients.map((c, i) => `<option value="${i}">${esc(c.name)}${c.phone ? " — " + esc(c.phone) : ""}</option>`).join("");
+  $("mClient").addEventListener("change", () => {
+    const value = $("mClient").value;
+    if (value === "") return;
+    const c = clients[Number(value)];
+    if (!c) return;
+    $("mName").value = c.name || "";
+    $("mPhone").value = c.phone || "";
+  });
+  $("mSvc").innerHTML = ((price.services || []).map(s => s.name).filter(Boolean)).map(name => `<option value="${esc(name)}">`).join("");
+  $("mDate").value = today;
+  $("mTime").value = "12:00";
+  $("mPhone").addEventListener("input", e => { e.target.value = maskPhone(e.target.value, (e.inputType || "").startsWith("delete")); });
+  $("addBtn").addEventListener("click", () => {
+    $("manual").hidden = !$("manual").hidden;
+    if (!$("manual").hidden) $("mName").focus();
+  });
+  $("mCancel").addEventListener("click", () => { $("manual").hidden = true; });
+  $("manual").addEventListener("submit", async e => {
+    e.preventDefault();
+    const name = $("mName").value.trim();
+    const phone = $("mPhone").value;
+    if (!name) { setNote("Укажите имя клиента.", "err"); return $("mName").focus(); }
+    if (!normPhone(phone)) { setNote("Укажите телефон полностью.", "err"); return $("mPhone").focus(); }
+    const services = $("mServices").value.split(",").map(s => s.trim()).filter(Boolean);
+    if (!services.length) { setNote("Укажите хотя бы одну услугу.", "err"); return $("mServices").focus(); }
+    const day = $("mDate").value, time = $("mTime").value;
+    if (!day || !time) { setNote("Укажите дату и время.", "err"); return; }
+    const comment = $("mNote").value.trim();
+    if (DEMO) {
+      requests.push({ id: "demo-" + Date.now(), name, phone, services, day, time, comment, status: "confirmed", source: "manual" });
+      $("manual").hidden = true;
+      render();
+      setNote("Запись добавлена.", "ok");
+      return;
+    }
+    const button = $("mSave");
+    button.disabled = true;
+    setNote("Добавляем…");
+    try {
+      const response = await fetch(API_URL + "/api/booking/manual", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, phone, services, day, time, comment })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Не удалось добавить запись.");
+      $("manual").hidden = true;
+      $("mClient").value = "";
+      $("mName").value = "";
+      $("mPhone").value = "";
+      $("mServices").value = "";
+      $("mNote").value = "";
+      $("mDate").value = day;
+      $("mTime").value = time;
+      await load();
+      setNote("Запись добавлена.", "ok");
+    } catch (error) {
+      setNote(error.message, "err");
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
+$("filters").addEventListener("click", e => {
+  const button = e.target.closest("[data-f]");
+  if (!button) return;
+  filter = button.dataset.f;
+  $("filters").querySelectorAll("[data-f]").forEach(b => b.setAttribute("aria-pressed", b === button ? "true" : "false"));
+  render();
+});
+
+$("list").addEventListener("click", e => {
+  const button = e.target.closest("[data-confirm], [data-decline]");
+  if (!button) return;
+  button.disabled = true;
+  changeStatus(button.dataset.confirm || button.dataset.decline, button.dataset.confirm ? "confirmed" : "declined");
+});
+
+async function init() {
+  setupForm();
+  if (DEMO) {
+    signedIn = true;
+    $("authNote").hidden = true;
+    requests = demoRequests();
+    render();
+    return;
+  }
+  try {
+    const response = await fetch(API_URL + "/api/auth/me", { credentials: "include" });
+    if (!response.ok) { showAuth("Войдите в кабинет, чтобы увидеть график."); return; }
+    signedIn = true;
+    $("authNote").hidden = true;
+    await load();
+  } catch (error) {
+    showAuth("Не удалось связаться с сервером. Проверьте интернет.");
+  }
+}
+
+init();
+</script>
+</body>
+</html>
