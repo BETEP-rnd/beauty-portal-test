@@ -206,8 +206,26 @@ function windowsByDay(allowDemo = true) {
   return out;
 }
 let WIN = windowsByDay();
+let busy = [];
 // времена начала, когда услуга целиком помещается в окно
 const startsFor = (iso, dur) => (WIN[iso] || []).flatMap(([s, e]) => { const out = []; for (let t = s; t + dur <= e; t += STEP) out.push(t); return out; });
+function subtractBusy(out, list) {                             // занятые записи вычитаем из свободных окон
+  const toMin = s => { const [h, m] = String(s || "0:0").split(":").map(Number); return (h || 0) * 60 + (m || 0); };
+  list.forEach(item => {
+    const day = item.day;
+    if (!out[day]) return;
+    const start = toMin(item.time), end = start + Math.max(15, Math.min(600, Number(item.duration) || 60));
+    out[day] = out[day].flatMap(([s, e]) => {
+      if (end <= s || start >= e) return [[s, e]];
+      const parts = [];
+      if (s < start) parts.push([s, Math.min(e, start)]);
+      if (e > end) parts.push([Math.max(s, end), e]);
+      return parts.filter(([a, b]) => b > a);
+    });
+    if (!out[day].length) delete out[day];
+  });
+  return out;
+}
 
 // несколько услуг за визит: время и цена складываются; наращивание — только одно, «снятие без наращивания» — без наращивания
 const kind = n => /снятие.*без/i.test(n) ? "off" : /нижн/i.test(n) ? "low" : /объ[её]м|уголк|классик|\b\d([,.]\d)?d\b/i.test(n) ? "ext" : "";
@@ -384,6 +402,7 @@ $("send").addEventListener("click", async () => {
       $("doneText").innerHTML = `${summaryText()}<br>Мастер: ${esc(prof.master.trim())}, ${esc(fmtPhone(prof.phone))}<br>Вы: ${esc($("cName").value.trim())}, ${esc(fmtPhone($("cPhone").value))}`;
       $("doneHint").textContent = "Заявка отправлена. Мастер подтвердит запись и свяжется с вами.";
       const big = document.querySelector("#done .big"); if (big) big.textContent = "Заявка отправлена";
+      WIN = subtractBusy(WIN, [{ day: sel.day, time: hm(sel.time), duration: total().dur }]);
       ["sCal", "s1", "s2", "s3", "s4", "modes"].forEach(id => $(id).hidden = true); $("done").hidden = false;
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
@@ -415,6 +434,7 @@ async function init() {
       prof = data.profile || prof;
       price = data.price || {};
       win = data.windows || {};
+      busy = Array.isArray(data.busy) ? data.busy : [];
       const botUrl = data.botUrl || "";
       if (botUrl) {
         ["tgNotify", "tgNotifyDone"].forEach(id => { const el = $(id); if (el) { el.href = botUrl + "?start=notify"; el.hidden = false; } });
@@ -430,7 +450,7 @@ async function init() {
     }
   }
   SVCS = svcsFromPrice(!PUBLIC);
-  WIN = windowsByDay(!PUBLIC);
+  WIN = subtractBusy(windowsByDay(!PUBLIC), busy);
   calMonth = (Object.keys(WIN).sort()[0] || today).slice(0, 7);
   if (PUBLIC && !SVCS.length) {
     $("modes").hidden = true;

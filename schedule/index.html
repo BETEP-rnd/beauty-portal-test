@@ -93,6 +93,13 @@
   .manual { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
   .manual .wide { grid-column: 1 / -1; }
   .manual .actions { grid-column: 1 / -1; display: flex; gap: 8px; }
+  .svc-add { display: flex; gap: 8px; align-items: stretch; }
+  .svc-add input { flex: 1; min-width: 0; }
+  .svc-add .btn { min-width: 44px; padding: 0 14px; font-size: 20px; line-height: 1; }
+  .svc-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .svc-chip { display: inline-flex; align-items: center; gap: 4px; padding: 5px 6px 5px 9px; border: 1px solid var(--line); border-radius: 99px; background: var(--field); font-size: 12.5px; line-height: 1.2; }
+  .svc-chip button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 16px; line-height: 1; padding: 0 2px; cursor: pointer; }
+  .svc-chip button:hover { color: var(--bad); }
   @media (max-width: 760px) {
     .stats { grid-template-columns: 1fr 1fr; }
     .daynav .title { font-size: 21px; }
@@ -201,7 +208,7 @@
       <div class="field"><label for="mDate" class="req">Дата</label><input id="mDate" type="date" required></div>
       <div class="field"><label for="mTime" class="req">Время</label><input id="mTime" type="time" step="900" required></div>
       <div class="field"><label for="mDuration" class="req">Длительность</label><select id="mDuration"><option value="30">30 минут</option><option value="60">1 час</option><option value="90" selected>1,5 часа</option><option value="120">2 часа</option><option value="150">2,5 часа</option><option value="180">3 часа</option><option value="240">4 часа</option></select></div>
-      <div class="field"><label for="mServices" class="req">Услуги</label><input id="mServices" type="text" list="mSvc" maxlength="200" placeholder="Через запятую, например: Уголки" required><datalist id="mSvc"></datalist></div>
+      <div class="field wide"><label for="mSvcInput" class="req">Услуги</label><div class="svc-add"><input id="mSvcInput" type="text" list="mSvc" maxlength="80" placeholder="Начни вводить услугу"><button class="btn ghost" type="button" id="mSvcAdd" aria-label="Добавить услугу">+</button></div><div class="svc-chips" id="mSvcChips"></div><datalist id="mSvc"></datalist></div>
       <div class="field wide"><label for="mNote">Комментарий</label><textarea id="mNote" maxlength="300" placeholder="Пожелания, особенности, заметка"></textarea></div>
       <div class="actions"><button class="btn" type="submit" id="mSave">Добавить</button><button class="btn ghost" type="button" id="mCancel">Отмена</button></div>
     </form>
@@ -233,6 +240,7 @@ const DEMO = new URLSearchParams(location.search).has("demo");
 let requests = [], selectedDate = today, view = "day", filter = "all", signedIn = false;
 let freeWindows = {}, baseStart = 8 * 60, baseEnd = 22 * 60, viewStart = 8 * 60, viewEnd = 22 * 60;
 let masterName = "Мастер";
+let manualServices = [];
 
 const demoRequests = () => [
   { id: "demo-1", name: "Анна Смирнова", phone: "+79000000001", services: ["Объём 1,5D–2D"], day: today, time: "14:00", duration: 120, comment: "", status: "pending", source: "online" },
@@ -441,7 +449,9 @@ function openManual(day, time) {
   $("mClient").value = "";
   $("mName").value = "";
   $("mPhone").value = "";
-  $("mServices").value = "";
+  manualServices = [];
+  renderManualServices();
+  $("mSvcInput").value = "";
   $("mNote").value = "";
   $("mDate").value = day || selectedDate;
   $("mTime").value = time || "12:00";
@@ -451,6 +461,18 @@ function openManual(day, time) {
 }
 
 function closeManual() { $("manualOverlay").hidden = true; }
+
+function renderManualServices() {
+  $("mSvcChips").innerHTML = manualServices.map((name, i) => `<span class="svc-chip">${esc(name)}<button type="button" data-svc="${i}" aria-label="Убрать услугу ${esc(name)}">×</button></span>`).join("");
+}
+
+function addManualService(raw) {
+  const name = String(raw || "").trim();
+  if (!name) return false;
+  if (!manualServices.some(item => item.toLowerCase() === name.toLowerCase())) manualServices.push(name);
+  renderManualServices();
+  return true;
+}
 
 function showAuth(text) {
   signedIn = false;
@@ -467,8 +489,10 @@ function setup() {
   masterName = String(prof.master || "").trim() || "Мастер";
   const win = DEMO ? { dayStart: "10:00", dayEnd: "20:00", free: demoFree } : (Kit.loadJSON("windows.v1") || {});
   freeWindows = win.free || {};
-  baseStart = timeToMin(win.dayStart || "08:00");
-  baseEnd = timeToMin(win.dayEnd || "22:00");
+  const range = Kit.loadJSON("schedule.v1") || {};
+  baseStart = timeToMin(range.start || win.dayStart || "08:00");
+  baseEnd = timeToMin(range.end || win.dayEnd || "22:00");
+  if (baseEnd <= baseStart || baseEnd - baseStart < 60) { baseStart = 8 * 60; baseEnd = 22 * 60; }
 
   const clients = Kit.loadClients() || [];
   const price = Kit.loadJSON("price.v1") || {};
@@ -482,6 +506,15 @@ function setup() {
     $("mPhone").value = c.phone || "";
   });
   $("mSvc").innerHTML = ((price.services || []).map(s => s.name).filter(Boolean)).map(name => `<option value="${esc(name)}">`).join("");
+  const addTypedService = () => {
+    if (addManualService($("mSvcInput").value)) { $("mSvcInput").value = ""; $("mSvcInput").focus(); }
+  };
+  $("mSvcAdd").addEventListener("click", addTypedService);
+  $("mSvcInput").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addTypedService(); } });
+  $("mSvcChips").addEventListener("click", e => {
+    const remove = e.target.closest("[data-svc]");
+    if (remove) { manualServices.splice(Number(remove.dataset.svc), 1); renderManualServices(); }
+  });
   $("mPhone").addEventListener("input", e => { e.target.value = maskPhone(e.target.value, (e.inputType || "").startsWith("delete")); });
 
   $("week").addEventListener("click", e => {
@@ -548,8 +581,9 @@ function setup() {
     const phone = $("mPhone").value;
     if (!name) { setNote("Укажите имя клиента.", "err"); return $("mName").focus(); }
     if (!normPhone(phone)) { setNote("Укажите телефон полностью.", "err"); return $("mPhone").focus(); }
-    const services = $("mServices").value.split(",").map(s => s.trim()).filter(Boolean);
-    if (!services.length) { setNote("Укажите хотя бы одну услугу.", "err"); return $("mServices").focus(); }
+    if ($("mSvcInput").value.trim()) { addManualService($("mSvcInput").value); $("mSvcInput").value = ""; }
+    const services = manualServices.slice();
+    if (!services.length) { setNote("Укажите хотя бы одну услугу.", "err"); return $("mSvcInput").focus(); }
     const day = $("mDate").value, time = $("mTime").value;
     const duration = Number($("mDuration").value) || 90;
     if (!day || !time) { setNote("Укажите дату и время.", "err"); return; }

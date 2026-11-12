@@ -836,9 +836,15 @@ async function bookingPublish(req, res) {
 
 async function bookingPublic(req, res, slug) {
   if (!validBookingSlug(slug)) throw new HttpError(404, "Страница записи не найдена.");
-  const result = await pool.query("SELECT data, updated_at FROM booking_profiles WHERE slug = $1", [slug]);
+  const result = await pool.query("SELECT master_id, data, updated_at FROM booking_profiles WHERE slug = $1", [slug]);
   if (!result.rows.length) throw new HttpError(404, "Страница записи не найдена или снята с публикации.");
-  json(res, 200, { ...result.rows[0].data, updatedAt: result.rows[0].updated_at, botUrl: process.env.TELEGRAM_BOT_USERNAME ? "https://t.me/" + process.env.TELEGRAM_BOT_USERNAME : "" });
+  const masterId = result.rows[0].master_id;
+  await pool.query("UPDATE booking_requests SET status = 'expired' WHERE master_id = $1 AND status = 'pending' AND hold_until < now()", [masterId]);
+  const busy = await pool.query(
+    "SELECT to_char(day, 'YYYY-MM-DD') AS day, time, duration FROM booking_requests WHERE master_id = $1 AND status IN ('pending', 'confirmed') AND day >= current_date AND day <= current_date + interval '370 days' ORDER BY day, time",
+    [masterId]
+  );
+  json(res, 200, { ...result.rows[0].data, busy: busy.rows, updatedAt: result.rows[0].updated_at, botUrl: process.env.TELEGRAM_BOT_USERNAME ? "https://t.me/" + process.env.TELEGRAM_BOT_USERNAME : "" });
 }
 
 async function bookingRequest(req, res) {
@@ -876,9 +882,14 @@ async function bookingRequest(req, res) {
   const free = row.data && row.data.windows && row.data.windows.free;
   const intervals = free && free[day];
   const minutes = hour * 60 + minute;
-  if (!Array.isArray(intervals) || !intervals.some(pair => Array.isArray(pair) && pair.length === 2 && Number.isFinite(pair[0]) && Number.isFinite(pair[1]) && minutes >= pair[0] && minutes < pair[1])) {
+  if (!Array.isArray(intervals) || !intervals.some(pair => Array.isArray(pair) && pair.length === 2 && Number.isFinite(pair[0]) && Number.isFinite(pair[1]) && minutes >= pair[0] && minutes + duration <= pair[1])) {
     throw new HttpError(409, "Это время уже недоступно. Обновите страницу и выберите другое.");
   }
+  const conflict = await pool.query(
+    "SELECT 1 FROM booking_requests WHERE master_id = $1 AND day = $2::date AND status IN ('pending', 'confirmed') AND (status = 'confirmed' OR hold_until > now()) AND (day + time::time) < ($2::date + $3::time + $4::int * interval '1 minute') AND (day + time::time + duration * interval '1 minute') > ($2::date + $3::time) LIMIT 1",
+    [row.master_id, day, time, duration]
+  );
+  if (conflict.rows.length) throw new HttpError(409, "Это время уже занято. Выберите другое.");
   const insert = await pool.query(
     "INSERT INTO booking_requests (master_id, name, phone, services, day, time, comment, client_chat_id, duration) VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9) RETURNING id",
     [row.master_id, name, phone, JSON.stringify(services), day, time, comment, clientChatId, duration]
