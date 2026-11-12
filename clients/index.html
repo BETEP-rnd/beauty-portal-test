@@ -72,8 +72,25 @@
 
   .cc-black { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-top: 8px; margin-top: 2px; border-top: 1px dashed var(--line); }
   .cc-black .linkbtn[disabled] { opacity: .4; cursor: default; }
-  .cc-black .flag { display: inline-flex; width: 36px; height: 36px; color: var(--accent); }
-  .cc-black .flag svg { display: block; width: 36px; height: 36px; }
+  .cc-black .flag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 7px;
+    border: 1px solid #f5e9e4;
+    border-radius: 3px;
+    background: #1a1014;
+    color: #f5e9e4;
+    font-family: var(--ui);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: .06em;
+    text-align: center;
+    text-transform: uppercase;
+    white-space: nowrap;
+    transform: rotate(-8deg);
+  }
 
 </style>
 
@@ -126,7 +143,6 @@
 const { esc, normPhone, fmtPhone, maskPhone } = Kit, $ = id => document.getElementById(id);
 const API_URL = "https://api.masterfolio.ru";
 let blocked = new Set();
-const BLACK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3.5" width="15" height="18" rx="3"/><rect x="8.5" y="1.6" width="7" height="3.2" rx="1.6" fill="currentColor" stroke="none"/><path d="M7.5 8.6l1.5 1.5 2.6-2.6"/><path d="M13.6 8.6h4.2"/><path d="M7.5 13l1.5 1.5 2.6-2.6"/><path d="M13.6 13h4.2"/><path d="M7.5 17.4l1.5 1.5 2.6-2.6"/><path d="M13.6 17.4h4.2"/><path d="M6 20h12" stroke-width="2.2"/></g></svg>';
 
 const MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
 const MONTHS1 = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
@@ -205,7 +221,7 @@ function card(c) {
     <div class="cc-black">
       <button class="linkbtn" type="button" data-block="${esc(p)}" ${isBlocked || !p ? "disabled" : ""}>Добавить в ЧС</button>
       <button class="linkbtn" type="button" data-unblock="${esc(p)}" ${isBlocked && p ? "" : "disabled"}>Исключить из ЧС</button>
-      ${isBlocked ? `<span class="flag" role="img" aria-label="В чёрном списке" title="В чёрном списке">${BLACK_ICON}</span>` : ""}
+      ${isBlocked ? '<span class="flag" aria-label="В чёрном списке" title="В чёрном списке">ЧЁРНЫЙ<br>СПИСОК</span>' : ""}
     </div>
   </article>`;
 }
