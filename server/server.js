@@ -860,6 +860,7 @@ async function bookingRequest(req, res) {
   if (hour > 23 || minute > 59) throw new HttpError(400, "Выберите время.");
   if (data.consent !== true) throw new HttpError(400, "Нужно согласие на обработку данных.");
   const comment = String(data.comment || "").trim().slice(0, 300);
+  const duration = Math.max(15, Math.min(600, Number(data.duration) || 60));
   const found = await pool.query("SELECT master_id, data FROM booking_profiles WHERE slug = $1", [slug]);
   if (!found.rows.length) throw new HttpError(404, "Страница записи не найдена или снята с публикации.");
   const row = found.rows[0];
@@ -879,8 +880,8 @@ async function bookingRequest(req, res) {
     throw new HttpError(409, "Это время уже недоступно. Обновите страницу и выберите другое.");
   }
   const insert = await pool.query(
-    "INSERT INTO booking_requests (master_id, name, phone, services, day, time, comment, client_chat_id) VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8) RETURNING id",
-    [row.master_id, name, phone, JSON.stringify(services), day, time, comment, clientChatId]
+    "INSERT INTO booking_requests (master_id, name, phone, services, day, time, comment, client_chat_id, duration) VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9) RETURNING id",
+    [row.master_id, name, phone, JSON.stringify(services), day, time, comment, clientChatId, duration]
   );
   try {
     const link = await pool.query("SELECT chat_id FROM telegram_links WHERE master_id = $1", [row.master_id]);
@@ -907,7 +908,7 @@ async function bookingRequests(req, res) {
   const master = await requireMaster(req);
   await pool.query("UPDATE booking_requests SET status = 'expired' WHERE master_id = $1 AND status = 'pending' AND hold_until < now()", [master.id]);
   const result = await pool.query(
-    "SELECT id, name, phone, services, to_char(day, 'YYYY-MM-DD') AS day, time, comment, status, source, created_at FROM booking_requests WHERE master_id = $1 ORDER BY created_at DESC LIMIT 200",
+    "SELECT id, name, phone, services, to_char(day, 'YYYY-MM-DD') AS day, time, comment, status, source, duration, created_at FROM booking_requests WHERE master_id = $1 ORDER BY created_at DESC LIMIT 200",
     [master.id]
   );
   json(res, 200, { requests: result.rows });
@@ -948,11 +949,12 @@ async function bookingManual(req, res) {
   const time = String(data.time || "");
   if (!/^\d{2}:\d{2}$/.test(time)) throw new HttpError(400, "Выберите время.");
   const comment = String(data.comment || "").trim().slice(0, 300);
+  const duration = Math.max(15, Math.min(600, Number(data.duration) || 90));
   const client = await pool.query("SELECT chat_id FROM telegram_clients WHERE phone = $1", [phone]);
   const clientChatId = client.rows[0]?.chat_id || null;
   const result = await pool.query(
-    "INSERT INTO booking_requests (master_id, name, phone, services, day, time, comment, client_chat_id, source, status, confirmed_at) VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, 'manual', 'confirmed', now()) RETURNING id",
-    [master.id, name, phone, JSON.stringify(services), day, time, comment, clientChatId]
+    "INSERT INTO booking_requests (master_id, name, phone, services, day, time, comment, client_chat_id, source, status, confirmed_at, duration) VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, 'manual', 'confirmed', now(), $9) RETURNING id",
+    [master.id, name, phone, JSON.stringify(services), day, time, comment, clientChatId, duration]
   );
   if (clientChatId) {
     try {
