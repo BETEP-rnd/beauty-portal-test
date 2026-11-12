@@ -35,6 +35,10 @@
   .requests .request { display: flex; flex-direction: column; gap: 3px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.45; }
   .requests .request:first-child { border-top: 0; padding-top: 0; }
   .requests .request span { color: var(--muted); }
+  .sched-range { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-top: 12px; }
+  .sched-range .field { flex: 1 1 110px; }
+  .sched-range .btn { min-height: 40px; }
+  .card .hint { margin-top: 8px; color: var(--muted); font-size: 13px; line-height: 1.5; }
 
 
   @media (min-width: 421px) { .me .socin { grid-template-columns: 128px minmax(0, 1fr) auto; } }
@@ -71,6 +75,16 @@
       <a class="card" id="bookingCard" href="../booking/"><b>Онлайн-запись</b><span>Клиенты выберут услугу и время, оставят заявку, а вы подтвердите запись.</span></a>      <a class="card" href="../clients/"><b>Мои клиенты</b><span>Телефоны, дни рождения, любимые услуги и сколько раз их делали. Напомнит, кому скоро дарить сертификат. Демо: данные только в этом браузере.</span></a>
 
       <a class="card" href="../schedule/"><b>График работы</b><span>Все записи по дням, онлайн и вручную, статусы и подтверждение.</span></a>
+      <div class="card" id="scheduleRangeCard">
+        <b>Период в графике</b>
+        <span>Какие часы показывать в «Графике работы». Записи вне периода тоже будут видны.</span>
+        <div class="sched-range">
+          <div class="field"><label for="schedStart">С</label><input id="schedStart" type="time" step="1800"></div>
+          <div class="field"><label for="schedEnd">До</label><input id="schedEnd" type="time" step="1800"></div>
+          <button class="btn" type="button" id="schedSave">Сохранить</button>
+        </div>
+        <div class="hint" id="schedStatus"></div>
+      </div>
 <div class="card publish" id="publishCard">
         <b>Онлайн-запись для клиентов</b>
         <span>Опубликуйте прайс и свободные окошки. Клиенты откроют запись по QR и оставят заявку.</span>
@@ -130,6 +144,16 @@ if (want === "email" || want === "hideBusy") panel.focus(want);
 else if (prof.soc[want]) panel.focus(prof.soc[want].val.trim() || want === "wa" ? want + "-on" : "soc-" + want);
 Kit.saveProfile(prof);                                          // данные по умолчанию сразу видны и в разделах
 hello();
+const schedSaved = Kit.loadJSON("schedule.v1") || {}, schedWin = Kit.loadJSON("windows.v1") || {};
+$("schedStart").value = schedSaved.start || schedWin.dayStart || "08:00";
+$("schedEnd").value = schedSaved.end || schedWin.dayEnd || "22:00";
+["schedStart", "schedEnd"].forEach(id => $(id).addEventListener("input", () => { $("schedStatus").textContent = ""; }));
+$("schedSave").addEventListener("click", () => {
+  const start = $("schedStart").value, end = $("schedEnd").value;
+  if (!start || !end || start >= end) { $("schedStatus").textContent = "Начало должно быть раньше конца."; return; }
+  Kit.store.set("schedule.v1", JSON.stringify({ start, end }));
+  $("schedStatus").textContent = `Сохранено: график показывает ${start}–${end}.`;
+});
 const publishBtn = $("publishBtn"), publishStatus = $("publishStatus"), publishLink = $("publishLink"), bookingCard = $("bookingCard");
 function showPublished() {
   if (!prof.bookingUrl) return;
