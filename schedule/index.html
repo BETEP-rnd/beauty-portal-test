@@ -14,6 +14,19 @@
   .stat { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
   .stat span { color: var(--muted); font-size: 12px; line-height: 1.35; }
   .stat b { color: var(--accent); font-family: var(--display); font-size: 28px; font-weight: 600; line-height: 1; }
+  .month-panel { padding: 12px 14px; }
+  .month-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .month-head b { margin-right: auto; font-family: var(--display); font-size: 20px; font-weight: 600; }
+  .month-head .icon { height: 30px; min-width: 30px; }
+  .month-total { color: var(--muted); font-size: 12px; }
+  .month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+  .month-grid .wd { padding: 2px 0; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .04em; text-align: center; text-transform: uppercase; }
+  .mday { position: relative; min-height: 32px; border: 1px solid transparent; border-radius: 6px; background: var(--field); color: var(--text); font: inherit; font-size: 11px; cursor: pointer; }
+  .mday span { position: absolute; top: 4px; left: 6px; }
+  .mday i { position: absolute; right: 4px; bottom: 3px; color: var(--accent); font-size: 9px; font-style: normal; font-weight: 700; }
+  .mday.today { border-color: var(--accent); }
+  .mday.sel { background: var(--accent); color: var(--accent-ink); }
+  .mday.sel i { color: inherit; }
   .daybar { padding: 14px 16px; gap: 12px; }
   .daynav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .daynav .title { margin-right: auto; font-family: var(--display); font-size: 24px; font-weight: 600; line-height: 1.05; }
@@ -90,6 +103,7 @@
   .detail-row span { color: var(--muted); }
   .detail-row b { text-align: right; font-weight: 500; }
   .detail-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .btn.danger { border-color: var(--bad); color: var(--bad); }
   .manual { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
   .manual .wide { grid-column: 1 / -1; }
   .manual .actions { grid-column: 1 / -1; display: flex; gap: 8px; }
@@ -134,7 +148,7 @@
 <div class="wrap">
   <header class="top">
     <h1>График работы</h1>
-    <nav><a href="../">Главная</a><a href="../cabinet/">Кабинет</a><a href="../schedule/" aria-current="page">График</a><a href="../price/">Прайс-лист</a><a href="../windows/">Свободные окошки</a><a href="../certs/">Сертификаты</a><a href="../booking/">Онлайн-запись</a><a href="../clients/">Мои клиенты</a></nav>
+    <nav><a href="../">Главная</a><a href="../cabinet/">Кабинет</a><a href="../schedule/" aria-current="page">График</a><a href="../price/">Прайс-лист</a><a href="../windows/">Свободные окошки</a><a href="../certs/">Сертификаты</a><a href="../clients/">Мои клиенты</a></nav>
   </header>
 
   <div class="ynote" id="authNote" hidden></div>
@@ -144,6 +158,16 @@
       <div class="stat"><span>Ожидают подтверждения</span><b id="statPending">0</b></div>
       <div class="stat"><span>Сегодня</span><b id="statToday">0</b></div>
       <div class="stat"><span>На неделе</span><b id="statWeek">0</b></div>
+    </section>
+
+    <section class="panel month-panel" id="monthPanel">
+      <div class="month-head">
+        <button class="icon" type="button" id="monthPrev" aria-label="Предыдущий месяц">‹</button>
+        <b id="monthTitle"></b>
+        <button class="icon" type="button" id="monthNext" aria-label="Следующий месяц">›</button>
+        <span class="month-total" id="monthTotal"></span>
+      </div>
+      <div class="month-grid" id="monthGrid"></div>
     </section>
 
     <section class="panel daybar" id="daybar">
@@ -241,6 +265,7 @@ let requests = [], selectedDate = today, view = "day", filter = "all", signedIn 
 let freeWindows = {}, baseStart = 8 * 60, baseEnd = 22 * 60, viewStart = 8 * 60, viewEnd = 22 * 60;
 let masterName = "Мастер";
 let manualServices = [];
+let monthCursor = today.slice(0, 7);
 
 const demoRequests = () => [
   { id: "demo-1", name: "Анна Смирнова", phone: "+79000000001", services: ["Объём 1,5D–2D"], day: today, time: "14:00", duration: 120, comment: "", status: "pending", source: "online" },
@@ -296,6 +321,26 @@ function renderWeek() {
   }).join("");
 }
 
+const plural = (n, one, few, many) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? one : m >= 2 && m <= 4 && (h < 12 || h > 14) ? few : many; };
+const moveMonth = (key, step) => { const [year, month] = key.split("-").map(Number); const d = new Date(year, month - 1 + step, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
+function renderMonth() {
+  const [year, month] = monthCursor.split("-").map(Number);
+  const first = new Date(year, month - 1, 1);
+  const shift = (first.getDay() + 6) % 7;
+  const days = new Date(year, month, 0).getDate();
+  const counts = {};
+  requests.forEach(r => { if (r.status === "pending" || r.status === "confirmed") counts[r.day] = (counts[r.day] || 0) + 1; });
+  const total = Object.keys(counts).filter(day => day.startsWith(monthCursor)).reduce((sum, day) => sum + counts[day], 0);
+  const title = first.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  $("monthTitle").textContent = title.charAt(0).toUpperCase() + title.slice(1);
+  $("monthTotal").textContent = `${total} ${plural(total, "запись", "записи", "записей")}`;
+  let html = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map(day => `<span class="wd">${day}</span>`).join("") + `<span></span>`.repeat(shift);
+  for (let day = 1; day <= days; day++) {
+    const key = `${monthCursor}-${pad(day)}`, count = counts[key] || 0;
+    html += `<button type="button" class="mday${key === today ? " today" : ""}${key === selectedDate ? " sel" : ""}" data-day="${key}"><span>${day}</span>${count ? `<i>${count}</i>` : ""}</button>`;
+  }
+  $("monthGrid").innerHTML = html;
+}
 function layoutAppointments(list) {
   const items = list.map(r => ({ r, start: timeToMin(r.time), end: timeToMin(r.time) + durationOf(r), lane: 0 })).sort((a, b) => a.start - b.start);
   const laneEnds = [];
@@ -379,6 +424,8 @@ function renderAll() {
   $("masterName").textContent = masterName;
   renderStats();
   renderWeek();
+  if (monthCursor !== selectedDate.slice(0, 7)) monthCursor = selectedDate.slice(0, 7);
+  renderMonth();
   $("dayView").hidden = view !== "day";
   $("listView").hidden = view !== "list";
   $("dayTitle").hidden = view !== "day";
@@ -389,6 +436,20 @@ function renderAll() {
   $("dayTitle").textContent = dateLabel(selectedDate);
   renderDay();
   renderList();
+}
+
+async function refreshPriceOptions() {
+  try {
+    const response = await fetch(API_URL + "/api/price", { credentials: "include" });
+    if (!response.ok) return;
+    const data = await response.json();
+    if (!data.price || !Array.isArray(data.price.services)) return;
+    const names = data.price.services.map(item => String(item.name || "").trim()).filter(Boolean);
+    if (!names.length) return;
+    $("mSvc").innerHTML = names.map(name => `<option value="${esc(name)}">`).join("");
+    const local = Kit.loadJSON("price.v1") || {};
+    Kit.store.set("price.v1", JSON.stringify({ ...local, services: data.price.services, currency: data.price.currency || local.currency }));
+  } catch (error) {}
 }
 
 async function load() {
@@ -422,6 +483,22 @@ async function changeStatus(id, status) {
   } catch (error) { setNote(error.message, "err"); }
 }
 
+async function deleteRequest(id) {
+  if (!confirm("Удалить запись? Действие необратимо.")) return;
+  if (DEMO) {
+    requests = requests.filter(item => item.id !== id);
+    closeDetail(); renderAll(); setNote("Запись удалена.", "ok");
+    return;
+  }
+  setNote("Удаляем…");
+  try {
+    const response = await fetch(API_URL + "/api/booking/delete", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Не удалось удалить.");
+    closeDetail(); await load(); setNote("Запись удалена.", "ok");
+  } catch (error) { setNote(error.message, "err"); }
+}
+
 function openDetail(id) {
   const r = requests.find(item => item.id === id);
   if (!r) return;
@@ -429,9 +506,7 @@ function openDetail(id) {
   const source = r.source === "manual" ? "manual" : "online";
   const services = Array.isArray(r.services) ? r.services.join(", ") : String(r.services || "");
   const end = minToTime(timeToMin(r.time) + durationOf(r));
-  const actions = status === "pending"
-    ? `<div class="detail-actions"><button class="btn" type="button" data-ok="${esc(r.id)}">Подтвердить</button><button class="btn ghost" type="button" data-no="${esc(r.id)}">Отклонить</button></div>`
-    : "";
+  const actions = `<div class="detail-actions">${status === "pending" ? `<button class="btn" type="button" data-ok="${esc(r.id)}">Подтвердить</button><button class="btn ghost" type="button" data-no="${esc(r.id)}">Отклонить</button>` : ""}<button class="btn ghost danger" type="button" data-del="${esc(r.id)}">Удалить</button></div>`;
   $("detail").innerHTML = `<div class="detail-head"><span class="badge ${source}">${source === "manual" ? "Вручную" : "Онлайн-запись"}</span><span class="badge ${status}">${statusLabel(status)}</span></div>
     <h2>${esc(r.name)}</h2>
     ${r.phone ? `<a href="tel:${esc(r.phone)}" style="color:var(--accent);text-decoration:none;font-size:14px">${esc(fmtPhone(r.phone) || r.phone)}</a>` : ""}
@@ -525,6 +600,17 @@ function setup() {
     $("views").querySelectorAll("[data-v]").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === "day" ? "true" : "false"));
     renderAll();
   });
+  $("monthPrev").addEventListener("click", () => { monthCursor = moveMonth(monthCursor, -1); renderMonth(); });
+  $("monthNext").addEventListener("click", () => { monthCursor = moveMonth(monthCursor, 1); renderMonth(); });
+  $("monthGrid").addEventListener("click", e => {
+    const button = e.target.closest("[data-day]");
+    if (!button) return;
+    selectedDate = button.dataset.day;
+    view = "day";
+    monthCursor = selectedDate.slice(0, 7);
+    $("views").querySelectorAll("[data-v]").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === "day" ? "true" : "false"));
+    renderAll();
+  });
   $("prevDay").addEventListener("click", () => { selectedDate = addDays(selectedDate, -1); renderAll(); });
   $("nextDay").addEventListener("click", () => { selectedDate = addDays(selectedDate, 1); renderAll(); });
   $("todayBtn").addEventListener("click", () => { selectedDate = today; renderAll(); });
@@ -561,9 +647,10 @@ function setup() {
     openDetail(button.dataset.id);
   });
   $("detail").addEventListener("click", e => {
-    const ok = e.target.closest("[data-ok]"), no = e.target.closest("[data-no]");
+    const ok = e.target.closest("[data-ok]"), no = e.target.closest("[data-no]"), del = e.target.closest("[data-del]");
     if (ok) changeStatus(ok.dataset.ok, "confirmed");
     if (no) changeStatus(no.dataset.no, "declined");
+    if (del) deleteRequest(del.dataset.del);
   });
   $("masterCol").addEventListener("click", e => {
     if (e.target.closest(".appt-block")) return;
@@ -631,6 +718,7 @@ async function init() {
     if (!response.ok) { showAuth("Войдите в кабинет, чтобы увидеть график."); return; }
     signedIn = true;
     $("authNote").hidden = true;
+    await refreshPriceOptions();
     await load();
   } catch (error) { showAuth("Не удалось связаться с сервером. Проверьте интернет."); }
 }

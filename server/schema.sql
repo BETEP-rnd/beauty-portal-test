@@ -73,6 +73,7 @@ ALTER TABLE masters ADD COLUMN IF NOT EXISTS yandex_id text;
 CREATE UNIQUE INDEX IF NOT EXISTS masters_yandex_unique ON masters (yandex_id);
 ALTER TABLE masters ALTER COLUMN phone DROP NOT NULL;
 ALTER TABLE masters ALTER COLUMN password_hash DROP NOT NULL;
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS price jsonb;
 
 CREATE TABLE IF NOT EXISTS oauth_states (
   state text PRIMARY KEY,

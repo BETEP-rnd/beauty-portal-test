@@ -57,7 +57,7 @@
 <div class="wrap">
   <header class="top">
     <h1>Личный кабинет</h1>
-    <nav><a href="../">Главная</a><a href="../cabinet/" aria-current="page">Кабинет</a><a href="../schedule/">График</a><a href="../price/">Прайс-лист</a><a href="../windows/">Свободные окошки</a><a href="../certs/">Сертификаты</a><a href="../booking/">Онлайн-запись</a><a href="../clients/">Мои клиенты</a></nav>
+    <nav><a href="../">Главная</a><a href="../cabinet/" aria-current="page">Кабинет</a><a href="../schedule/">График</a><a href="../price/">Прайс-лист</a><a href="../windows/">Свободные окошки</a><a href="../certs/">Сертификаты</a><a href="../clients/">Мои клиенты</a></nav>
   </header>
 
   <div class="ynote" id="ynote" hidden></div>
@@ -69,14 +69,8 @@
         <div class="who" id="who"></div>
         <div class="facts" id="facts"></div>
       </div>
-      <a class="card" href="../price/"><b>Прайс-лист</b><span>Услуги и цены, свои услуги, 300 фонов, шрифты — картинка для сторис и мессенджеров.</span></a>
-      <a class="card" href="../windows/"><b>Свободные окошки</b><span>Отметьте свободное время на неделю или на 2–3 месяца — картинка для канала или сторис.</span></a>
-      <a class="card" href="../certs/"><b>Подарочные сертификаты</b><span>Выпуск сертификата с номером, проверка и погашение, журнал — по PIN. 300 фонов и шрифты, как в других разделах.</span></a>
-      <a class="card" id="bookingCard" href="../booking/"><b>Онлайн-запись</b><span>Клиенты выберут услугу и время, оставят заявку, а вы подтвердите запись.</span></a>      <a class="card" href="../clients/"><b>Мои клиенты</b><span>Телефоны, дни рождения, любимые услуги и сколько раз их делали. Напомнит, кому скоро дарить сертификат. Демо: данные только в этом браузере.</span></a>
-
-      <a class="card" href="../schedule/"><b>График работы</b><span>Все записи по дням, онлайн и вручную, статусы и подтверждение.</span></a>
       <div class="card" id="scheduleRangeCard">
-        <b>Период в графике</b>
+        <b>Период работы в графике</b>
         <span>Какие часы показывать в «Графике работы». Записи вне периода тоже будут видны.</span>
         <div class="sched-range">
           <div class="field"><label for="schedStart">С</label><input id="schedStart" type="time" step="1800"></div>
@@ -93,7 +87,7 @@
         <a id="publishLink" hidden target="_blank" rel="noopener">Открыть страницу записи</a>
       </div>
       <div class="card requests" id="requestsCard" hidden>
-        <b>Заявки на запись</b>
+        <b>Заявки на запись</b><span class="hint">Последние 10</span>
         <div id="requestsList"></div>
       </div>
     </div>
@@ -165,7 +159,19 @@ function showPublished() {
 showPublished();
 publishBtn.addEventListener("click", async () => {
   if (!signedIn) { publishStatus.textContent = "Сначала войдите в аккаунт."; return; }
-  const priceState = Kit.loadJSON("price.v1") || {}, winState = Kit.loadJSON("windows.v1") || {};
+  let priceState = Kit.loadJSON("price.v1") || {};
+  try {
+    const priceResponse = await fetch(API_URL + "/api/price", { credentials: "include" });
+    if (priceResponse.ok) {
+      const priceData = await priceResponse.json();
+      if (priceData.price && Array.isArray(priceData.price.services) && priceData.price.services.length) {
+        const local = Kit.loadJSON("price.v1") || {};
+        priceState = { ...local, services: priceData.price.services, currency: priceData.price.currency || local.currency };
+        Kit.store.set("price.v1", JSON.stringify(priceState));
+      }
+    }
+  } catch (error) {}
+  const winState = Kit.loadJSON("windows.v1") || {};
   const services = (priceState.services || []).filter(s => s && s.name && String(s.name).trim()).map(s => ({ name: String(s.name).trim(), price: String(s.price || "").trim() }));
   if (!services.length) { publishStatus.textContent = "Сначала добавьте услуги в прайс-листе."; return; }
   const free = {};
@@ -203,7 +209,7 @@ async function loadRequests() {
     const response = await fetch(API_URL + "/api/booking/requests", { credentials: "include" });
     if (!response.ok) return;
     const data = await response.json();
-    const list = data.requests || [];
+    const list = (data.requests || []).slice(0, 10);
     if (!list.length) return;
     $("requestsCard").hidden = false;
     $("requestsList").innerHTML = list.map(r => {

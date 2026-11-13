@@ -99,7 +99,7 @@
 <div class="wrap">
   <header class="top">
     <h1>Мои клиенты</h1>
-    <nav><a href="../">Главная</a><a href="../cabinet/">Кабинет</a><a href="../schedule/">График</a><a href="../price/">Прайс-лист</a><a href="../windows/">Свободные окошки</a><a href="../certs/">Сертификаты</a><a href="../booking/">Онлайн-запись</a><a href="../clients/" aria-current="page">Мои клиенты</a></nav>
+    <nav><a href="../">Главная</a><a href="../cabinet/">Кабинет</a><a href="../schedule/">График</a><a href="../price/">Прайс-лист</a><a href="../windows/">Свободные окошки</a><a href="../certs/">Сертификаты</a><a href="../clients/" aria-current="page">Мои клиенты</a></nav>
   </header>
 
   <div class="cl">
@@ -157,6 +157,15 @@ const SVC_NAMES = ((price && price.services && price.services.length) ? price.se
   ["Уголки", "Наращивание нижних ресниц", "Объём 1D (классика)", "Объём 1,5D–2D", "Объём 2,5D–3D", "Объём 4D–5D", "Снятие ресниц без последующего наращивания"])
   .map(n => (n || "").trim()).filter(Boolean);
 $("svcOpts").innerHTML = SVC_NAMES.map(n => `<option value="${esc(n)}">`).join("");
+(async () => {
+  try {
+    const response = await fetch("https://api.masterfolio.ru/api/price", { credentials: "include" });
+    if (!response.ok) return;
+    const data = await response.json();
+    const names = data.price && Array.isArray(data.price.services) ? data.price.services.map(s => String(s.name || "").trim()).filter(Boolean) : [];
+    if (names.length) $("svcOpts").innerHTML = names.map(n => `<option value="${esc(n)}">`).join("");
+  } catch (error) {}
+})();
 
 // примеры при первом открытии: дни рождения — от сегодняшнего дня, чтобы было видно напоминание
 function examples() {
