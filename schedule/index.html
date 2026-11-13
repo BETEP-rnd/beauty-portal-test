@@ -53,22 +53,22 @@
   .timeline-scroll { overflow-x: auto; }
   .timeline { display: grid; grid-template-columns: 64px minmax(0, 1fr); min-width: 0; }
   .times { position: relative; border-right: 1px solid var(--line); background: var(--panel); }
-  .times span { position: absolute; right: 8px; transform: translateY(-50%); color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+  .times span { position: absolute; right: 8px; transform: translateY(-50%); color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
   .times span:first-child { transform: none; }
   .times span:last-child { transform: translateY(-100%); }
-  .master-col { position: relative; min-height: 520px; cursor: crosshair; background-color: var(--panel); background-image: repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px 64px), repeating-linear-gradient(to bottom, color-mix(in srgb, var(--line) 45%, transparent) 0 1px, transparent 1px 32px); }
+  .master-col { position: relative; min-height: 520px; cursor: crosshair; background-color: var(--panel); background-image: repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px 72px), repeating-linear-gradient(to bottom, color-mix(in srgb, var(--line) 45%, transparent) 0 1px, transparent 1px 36px); }
   .free-layer { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
   .free-layer .free { position: absolute; left: 0; right: 0; background: color-mix(in srgb, var(--ok) 8%, transparent); border-left: 2px solid color-mix(in srgb, var(--ok) 45%, transparent); }
   .appts { position: absolute; inset: 0; z-index: 2; }
-  .appt-block { position: absolute; display: flex; flex-direction: column; gap: 1px; overflow: hidden; padding: 5px 7px; border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); font: inherit; text-align: left; cursor: pointer; box-shadow: 0 2px 6px rgba(40, 25, 15, .06); }
+  .appt-block { position: absolute; display: flex; flex-direction: column; gap: 1px; overflow: hidden; padding: 6px 8px; border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); font: inherit; text-align: left; cursor: pointer; box-shadow: 0 2px 6px rgba(40, 25, 15, .06); }
   .appt-block.pending { border-color: var(--accent); border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
   .appt-block.confirmed { border-color: color-mix(in srgb, var(--ok) 55%, var(--line)); border-left-color: var(--ok); background: color-mix(in srgb, var(--ok) 8%, var(--panel)); }
   .appt-block.manual { border-left-color: var(--muted); }
   .appt-block.declined, .appt-block.expired { opacity: .55; }
-  .appt-block .t { color: var(--muted); font-size: 9.5px; line-height: 1.1; font-variant-numeric: tabular-nums; }
-  .appt-block b { overflow: hidden; font-size: 12px; font-weight: 600; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
-  .appt-block .s { overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; }
-  .appt-block .src { position: absolute; top: 4px; right: 6px; color: var(--accent); font-size: 7.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+  .appt-block .t { overflow: hidden; color: var(--muted); font-size: 11px; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .appt-block b { overflow: hidden; font-size: 14px; font-weight: 600; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+  .appt-block .s { overflow: hidden; color: var(--muted); font-size: 11.5px; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; }
+  .appt-block .src { position: absolute; top: 4px; right: 6px; color: var(--accent); font-size: 8.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
   .appt-block.manual .src { color: var(--muted); }
   .now-line { position: absolute; left: 0; right: 0; z-index: 4; height: 1px; background: var(--accent); pointer-events: none; }
   .now-line::before { content: ""; position: absolute; left: 0; top: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
@@ -81,12 +81,12 @@
   .appt-card.pending { border-color: var(--accent); border-left-color: var(--accent); }
   .appt-card.confirmed { border-left-color: var(--ok); }
   .appt-card.declined, .appt-card.expired { opacity: .65; }
-  .appt-card .time { color: var(--muted); font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .appt-card .time { color: var(--muted); font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .appt-card .who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .appt-card .who b { font-size: 14px; }
-  .appt-card .who span { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+  .appt-card .who b { font-size: 15px; }
+  .appt-card .who span { color: var(--muted); font-size: 13.5px; line-height: 1.4; }
   .appt-card .badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-  .badge { border: 1px solid var(--line); border-radius: 99px; padding: 3px 6px; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+  .badge { border: 1px solid var(--line); border-radius: 99px; padding: 3px 6px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
   .badge.online { color: var(--accent); border-color: var(--accent); }
   .badge.manual { color: var(--muted); border-color: var(--line); }
   .badge.pending { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
@@ -133,8 +133,8 @@
     .week button .w { font-size: 8.5px; }
     .week button .d { font-size: 14px; }
     .timeline-head, .timeline { grid-template-columns: 52px minmax(0, 1fr); }
-    .times span { right: 5px; font-size: 9.5px; }
-    .appt-block { padding: 4px 5px; }
+    .times span { right: 5px; font-size: 10.5px; }
+    .appt-block { padding: 6px; }
     .appt-block .src { display: none; }
     .manual { grid-template-columns: 1fr; }
     .manual .wide, .manual .actions { grid-column: auto; }
@@ -259,7 +259,7 @@ const durationOf = r => Math.max(15, Math.min(600, Number(r.duration) || 60));
 const MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
 const DOW = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
 const DOW_SHORT = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
-const HOUR_H = 64;
+const HOUR_H = 72;
 const DEMO = new URLSearchParams(location.search).has("demo");
 let requests = [], selectedDate = today, view = "day", filter = "all", signedIn = false;
 let freeWindows = {}, baseStart = 8 * 60, baseEnd = 22 * 60, viewStart = 8 * 60, viewEnd = 22 * 60;
@@ -292,7 +292,7 @@ function dateLabel(day) {
 }
 
 function statusLabel(status) {
-  return status === "confirmed" ? "Подтверждена" : status === "declined" ? "Отклонена" : status === "expired" ? "Истекла" : "Ожидает";
+  return status === "confirmed" ? "Подтверждена" : status === "declined" ? "Отклонена" : status === "expired" ? "Истекла" : "Ожидает подтверждения";
 }
 
 function matchFilter(r) {
@@ -384,7 +384,7 @@ function renderDay() {
     const status = r.status || "pending";
     const source = r.source === "manual" ? "manual" : "online";
     return `<button class="appt-block ${status} ${source}" type="button" data-id="${esc(r.id)}" style="top:${top}px;height:${h}px;left:calc(${left}% + 2px);width:calc(${width}% - 4px)" title="${esc(r.name)} · ${esc(services)}">
-      <span class="t">${esc(r.time)}–${minToTime(end)}${status === "pending" ? " · ожидает" : ""}</span>
+      <span class="t">${esc(r.time)}–${minToTime(end)}${status === "pending" ? " · ожидает подтверждения" : ""}</span>
       <b>${esc(r.name)}</b>
       ${h >= 44 ? `<span class="s">${esc(services)}</span>` : ""}
       <span class="src">${source === "manual" ? "вручную" : "онлайн"}</span>
