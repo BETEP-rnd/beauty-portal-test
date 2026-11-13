@@ -776,7 +776,7 @@
     const head = document.querySelector("header.top");
     if (!head) return;
     let raf = 0;
-    const update = () => { head.classList.toggle("scrolled", window.scrollY > 8); raf = 0; };
+    const update = () => { head.classList.toggle("scrolled", window.scrollY > 0); raf = 0; };
     addEventListener("scroll", () => { if (!raf) raf = requestAnimationFrame(update); }, { passive: true });
     update();
   })();

@@ -269,5 +269,5 @@ header.top nav { grid-area: nav; }
 }
 
 /* прозрачная шапка: виден фон страницы */
-header.top { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; transition: background .2s ease, box-shadow .2s ease; }
-header.top.scrolled { background: var(--bg); box-shadow: 0 1px 0 var(--line), 0 10px 30px rgba(0,0,0,.08); }
+header.top { background: var(--page-bg, var(--bg)); -webkit-backdrop-filter: none; backdrop-filter: none; transition: none; }
+header.top.scrolled { background: var(--page-bg, var(--bg)); box-shadow: 0 1px 0 var(--line), 0 10px 30px rgba(0,0,0,.08); }
