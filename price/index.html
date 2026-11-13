@@ -63,7 +63,7 @@
           </div>
         </section>
 
-        <div id="contacts"></div>
+        
       </div>
 
       <div class="tab" data-tab="design" id="design" hidden></div>
@@ -141,7 +141,7 @@ if (saved && Array.isArray(saved.services)) ["theme", "format", "prof", "title",
 if (!Kit.THEMES[S.theme]) S.theme = "price-0";
 Kit.claimTheme("price", S);                                     // один фон — один раздел
 const prof = Kit.loadProfile();
-S.contacts = Kit.sectionShow(prof, S.contacts);            // что из контактов кабинета показать на картинке прайса
+S.contacts = Kit.defaultShow(prof);            // что из контактов кабинета показать на картинке прайса
 const th = () => Kit.THEMES[S.theme] || Kit.THEMES["lux-0"];
 const base = (k, t) => k === "services" ? { font: "Montserrat", weight: 400, italic: false, caps: false, color: t.ink }
   : k === "prices" ? { font: "Montserrat", weight: 600, italic: false, caps: false, color: t.accent } : null;
@@ -245,7 +245,7 @@ async function syncPrice() {
 // ---------- панели ----------
 const design = Kit.designPanel($("design"), S, kind => { if (kind === "theme") fonts.refresh(); changed(); }, { own: "price", self: "price", preview });
 const fonts = Kit.fontsPanel($("fonts"), TEXTS, S, style, changed);
-const contacts = Kit.showPanel($("contacts"), prof, S.contacts, changed);
+
 const tabs = Kit.tabs($("tabs"), "price.tab", name => { if (name === "design") design.show(); });
 
 // услуги
@@ -333,7 +333,7 @@ Kit.output({ download: $("download"), share: $("share"), status: $("status") }, 
   () => `Прайс_${Kit.safeName(prof.master)}.png`,
   () => {
     const err = Kit.profileError(prof) || (S.services.some(s => s.name.trim()) ? "" : "Добавьте хотя бы одну услугу.");
-    if (err) { tabs.show("content"); contacts.focus(err.includes("имя") ? "master" : err.includes("телефон") ? "phone" : ""); }
+    if (err) { tabs.show("content"); }
     return err;
   });
 

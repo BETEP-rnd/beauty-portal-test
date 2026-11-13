@@ -96,7 +96,7 @@
               <div class="field"><label for="t-role">Подпись мастера</label><input id="t-role" type="text" maxlength="40"></div>
             </div>
           </section>
-          <div id="contacts"></div>
+          
         </div>
 
         <div data-mode="check" hidden>
@@ -181,7 +181,7 @@ if (!Kit.THEMES[S.theme]) S.theme = "lux-0";
 Kit.claimTheme("certs", S);                                     // один фон — один раздел
 S.format = "cert";
 const prof = Kit.loadProfile();
-S.contacts = Kit.sectionShow(prof, S.contacts);            // что из контактов кабинета показать на сертификате
+S.contacts = Kit.defaultShow(prof);            // что из контактов кабинета показать на сертификате
 const th = () => Kit.THEMES[S.theme] || Kit.THEMES["lux-0"];
 function base(k, t) {                                           // как в утверждённом чёрно-золотом сертификате
   const f = (font, weight, italic, caps, color) => ({ font, weight, italic, caps, color });
@@ -433,7 +433,7 @@ $("reload").addEventListener("click", loadLog);
 // ---------- оформление ----------
 const design = Kit.designPanel($("design"), S, kind => { if (kind === "theme") fonts.refresh(); changed(); }, { formats: CERT, own: "certs", self: "certs", preview });
 const fonts = Kit.fontsPanel($("fonts"), TEXTS, S, style, changed);
-Kit.showPanel($("contacts"), prof, S.contacts, changed);
+
 [["t-top", "top"], ["t-title", "title"], ["t-purpose", "purpose"], ["t-role", "role"]].forEach(([id, k]) => {
   $(id).value = S[k]; $(id).addEventListener("input", e => { S[k] = e.target.value; changed(); });
 });
