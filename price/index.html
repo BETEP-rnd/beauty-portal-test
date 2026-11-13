@@ -70,7 +70,6 @@
       <div class="tab" data-tab="fonts" id="fonts" hidden></div>
 
       <section class="group">
-        <label class="check"><input type="checkbox" id="watermark"> Водяной знак «ОБРАЗЕЦ»</label>
         <div class="btnrow">
           <button class="btn" type="button" id="download">Скачать картинку</button>
           <button class="btn ghost" type="button" id="share" hidden>Отправить</button>
@@ -204,7 +203,6 @@ function paint(t, F) {
   const foot = Kit.footer(dr, t, F, Kit.forSection(prof, S.contacts), style), footTop = H - F.bottom - foot.h;
   services(y + 56, footTop - 64, t, 96);
   foot.draw(footTop);
-  if (S.watermark) dr.watermark(t, H);
 }
 // миниатюра в «Дизайне»: та же картинка с другим фоном
 function preview(c, t) {
@@ -326,7 +324,6 @@ $("prof").addEventListener("change", e => {
 });
 ["title", "subtitle"].forEach(id => $(id).addEventListener("input", e => { S[id] = e.target.value; changed(); }));
 $("currency").addEventListener("change", e => { S.currency = e.target.value; changed(); });
-$("watermark").addEventListener("change", e => { S.watermark = e.target.checked; changed(); });
 
 // ---------- сохранить и отправить ----------
 Kit.output({ download: $("download"), share: $("share"), status: $("status") }, canvas, draw,
@@ -339,7 +336,7 @@ Kit.output({ download: $("download"), share: $("share"), status: $("status") }, 
 
 // ---------- старт ----------
 $("title").value = S.title; $("subtitle").value = S.subtitle;
-$("prof").value = S.prof; $("currency").value = S.currency; $("watermark").checked = S.watermark;
+$("prof").value = S.prof; $("currency").value = S.currency;
 buildServices(); tabs.show(tabs.current); changed(); syncPrice();
 Promise.all([...fonts.fontsInUse(), '600 84px "Cormorant Garamond"', '128px "Marck Script"', '600 30px "Montserrat"'].map(f => document.fonts.load(f, "Прайс-лист 0123456789")))
   .catch(() => {}).then(() => { changed(); if (tabs.current === "design") design.show(); });

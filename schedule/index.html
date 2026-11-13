@@ -182,7 +182,6 @@
         </div>
         <button class="btn" type="button" id="addBtn">+ Запись</button>
       </div>
-      <div class="week" id="week"></div>
       <div class="filters" id="filters" role="group" aria-label="Фильтр записей">
         <button type="button" data-f="upcoming" aria-pressed="false">Предстоящие</button>
         <button type="button" data-f="all" aria-pressed="true">Все</button>
@@ -424,7 +423,6 @@ function renderAll() {
   $("masterName").textContent = masterName;
   $("monthPanel").hidden = false;
   renderStats();
-  renderWeek();
   if (monthCursor !== selectedDate.slice(0, 7)) monthCursor = selectedDate.slice(0, 7);
   renderMonth();
   $("dayView").hidden = view !== "day";
@@ -433,7 +431,6 @@ function renderAll() {
   $("prevDay").hidden = view !== "day";
   $("nextDay").hidden = view !== "day";
   $("todayBtn").hidden = view !== "day";
-  $("week").hidden = view !== "day";
   $("dayTitle").textContent = dateLabel(selectedDate);
   renderDay();
   renderList();
@@ -594,14 +591,6 @@ function setup() {
   });
   $("mPhone").addEventListener("input", e => { e.target.value = maskPhone(e.target.value, (e.inputType || "").startsWith("delete")); });
 
-  $("week").addEventListener("click", e => {
-    const button = e.target.closest("[data-day]");
-    if (!button) return;
-    selectedDate = button.dataset.day;
-    view = "day";
-    $("views").querySelectorAll("[data-v]").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === "day" ? "true" : "false"));
-    renderAll();
-  });
   $("monthPrev").addEventListener("click", () => { monthCursor = moveMonth(monthCursor, -1); renderMonth(); });
   $("monthNext").addEventListener("click", () => { monthCursor = moveMonth(monthCursor, 1); renderMonth(); });
   $("monthGrid").addEventListener("click", e => {
