@@ -94,6 +94,7 @@
   .badge.declined, .badge.expired { color: var(--muted); }
   .empty { padding: 24px 12px; text-align: center; }
   .status { min-height: 0; }
+  #status:empty { display: none; }
   .modal-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(22, 13, 17, .55); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
   .modal { position: relative; width: min(560px, 100%); max-height: 90vh; overflow: auto; padding: 20px 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); color: var(--text); box-shadow: 0 24px 70px rgba(0, 0, 0, .35); }
   .modal h2 { margin: 0 0 4px; font-family: var(--display); font-size: 28px; font-weight: 600; }
@@ -170,7 +171,7 @@
       <div class="month-grid" id="monthGrid"></div>
     </section>
 
-    <section class="panel daybar" id="daybar">
+    <section class="panel daybar" id="daybar" hidden>
       <div class="daynav">
         <button class="icon" type="button" id="prevDay" aria-label="Предыдущий день">‹</button>
         <b class="title" id="dayTitle">Сегодня</b>
@@ -189,8 +190,9 @@
         <button type="button" data-f="online" aria-pressed="false">Онлайн</button>
         <button type="button" data-f="manual" aria-pressed="false">Вручную</button>
       </div>
-      <div class="status" id="status" role="status"></div>
     </section>
+
+    <div class="status" id="status" role="status"></div>
 
     <section class="panel timeline-panel" id="dayView">
       <div class="timeline-head"><span>Время</span><b id="masterName">Мастер</b></div>
