@@ -133,10 +133,32 @@ async function currentMaster(req) {
   const token = parseCookies(req)["__Host-mf_session"];
   if (!token) return null;
   const result = await pool.query(
-    "SELECT m.id, m.name, m.email, m.phone FROM sessions s JOIN masters m ON m.id = s.master_id WHERE s.token_hash = $1 AND s.expires_at > now()",
+    "SELECT m.id, m.name, m.email, m.phone, m.price FROM sessions s JOIN masters m ON m.id = s.master_id WHERE s.token_hash = $1 AND s.expires_at > now()",
     [tokenHash(token)]
   );
   return result.rows[0] || null;
+}
+
+async function priceGet(req, res) {
+  const master = await requireMaster(req);
+  json(res, 200, { price: master.price || null });
+}
+
+async function priceSave(req, res) {
+  const master = await requireMaster(req);
+  const data = await body(req);
+  const price = data.price;
+  if (!price || typeof price !== "object" || !Array.isArray(price.services)) {
+    throw new HttpError(400, "Некорректный прайс.");
+  }
+  const services = price.services.slice(0, 200).map(item => ({
+    name: String(item && item.name || "").trim().slice(0, 100),
+    price: String(item && item.price || "").trim().slice(0, 30)
+  })).filter(item => item.name);
+  if (!services.length) throw new HttpError(400, "Добавьте хотя бы одну услугу.");
+  const currency = String(price.currency || "руб.").trim().slice(0, 10) || "руб.";
+  await pool.query("UPDATE masters SET price = $1::jsonb WHERE id = $2", [JSON.stringify({ services, currency }), master.id]);
+  json(res, 200, { price: { services, currency } });
 }
 
 function rateLimit(req, route) {
@@ -975,6 +997,16 @@ async function bookingManual(req, res) {
   json(res, 201, { ok: true, id: result.rows[0].id });
 }
 
+async function bookingDelete(req, res) {
+  const master = await requireMaster(req);
+  const data = await body(req);
+  const id = String(data.id || "");
+  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new HttpError(400, "Некорректная запись.");
+  const result = await pool.query("DELETE FROM booking_requests WHERE id = $1 AND master_id = $2 RETURNING id", [id, master.id]);
+  if (!result.rows.length) throw new HttpError(404, "Запись не найдена.");
+  json(res, 200, { ok: true });
+}
+
 async function bookingBlacklistList(masterId) {
   const result = await pool.query("SELECT phone, reason, created_at FROM booking_blacklist WHERE master_id = $1 ORDER BY created_at DESC", [masterId]);
   return result.rows;
@@ -1050,6 +1082,8 @@ async function handle(req, res) {
     if (!master) throw new HttpError(401, "Вход не выполнен.");
     return json(res, 200, { master });
   }
+  if (url.pathname === "/api/price" && req.method === "GET") return await priceGet(req, res);
+  if (url.pathname === "/api/price" && req.method === "POST") { rateLimit(req, "price-save"); return await priceSave(req, res); }
   if (url.pathname === "/api/booking/publish" && req.method === "POST") { rateLimit(req, "booking-publish"); return await bookingPublish(req, res); }
   if (url.pathname.startsWith("/api/booking/public/") && req.method === "GET") { rateLimit(req, "booking-public"); return await bookingPublic(req, res, url.pathname.slice("/api/booking/public/".length)); }
   if (url.pathname === "/api/booking/request" && req.method === "POST") { rateLimit(req, "booking-request"); return await bookingRequest(req, res); }
@@ -1058,6 +1092,7 @@ async function handle(req, res) {
   if (url.pathname === "/api/booking/blacklist" && req.method === "POST") { rateLimit(req, "booking-blacklist"); return await bookingBlacklistSet(req, res); }
   if (url.pathname === "/api/booking/status" && req.method === "POST") { rateLimit(req, "booking-status"); return await bookingStatus(req, res); }
   if (url.pathname === "/api/booking/manual" && req.method === "POST") { rateLimit(req, "booking-manual"); return await bookingManual(req, res); }
+  if (url.pathname === "/api/booking/delete" && req.method === "POST") { rateLimit(req, "booking-delete"); return await bookingDelete(req, res); }
   throw new HttpError(404, "Адрес не найден.");
 }
 

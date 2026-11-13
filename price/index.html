@@ -13,7 +13,7 @@
 <div class="wrap">
   <header class="top">
     <h1>Прайс-лист</h1>
-    <nav><a href="../">Главная</a><a href="../cabinet/">Кабинет</a><a href="../schedule/">График</a><a href="../price/" aria-current="page">Прайс-лист</a><a href="../windows/">Свободные окошки</a><a href="../certs/">Сертификаты</a><a href="../booking/">Онлайн-запись</a><a href="../clients/">Мои клиенты</a></nav>
+    <nav><a href="../">Главная</a><a href="../cabinet/">Кабинет</a><a href="../schedule/">График</a><a href="../price/" aria-current="page">Прайс-лист</a><a href="../windows/">Свободные окошки</a><a href="../certs/">Сертификаты</a><a href="../clients/">Мои клиенты</a></nav>
   </header>
 
   <div class="grid">
@@ -132,6 +132,8 @@ const $ = id => document.getElementById(id);
 
 // ---------- состояние ----------
 const KEY = "price.v1";
+const API_URL = "https://api.masterfolio.ru";
+let signedIn = false, syncReady = false, saveTimer = 0;
 let S = { theme: "price-0", format: "story", prof: "lash", title: "Прайс-лист", subtitle: "Наращивание ресниц",
   currency: "руб.", services: PROFS[0].services.slice(0, 7).map(([name, price]) => ({ name, price })), watermark: true, text: {}, contacts: null };
 const saved = Kit.loadJSON(KEY);
@@ -210,7 +212,35 @@ function preview(c, t) {
   try { paint(t, FORMATS[S.format] || FORMATS.story); } finally { [ctx, dr, S.theme, S.watermark] = keep; }
 }
 let raf = 0;
-function changed() { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); Kit.store.set(KEY, JSON.stringify(S)); }
+function changed() {
+  cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); Kit.store.set(KEY, JSON.stringify(S));
+  if (syncReady && signedIn) { clearTimeout(saveTimer); saveTimer = setTimeout(savePrice, 700); }
+}
+async function savePrice() {
+  try {
+    await fetch(API_URL + "/api/price", {
+      method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ price: { services: S.services.map(s => ({ name: s.name, price: s.price })), currency: S.currency } })
+    });
+  } catch (error) {}
+}
+async function syncPrice() {
+  try {
+    const me = await fetch(API_URL + "/api/auth/me", { credentials: "include" });
+    if (!me.ok) return;
+    signedIn = true;
+    const response = await fetch(API_URL + "/api/price", { credentials: "include" });
+    if (!response.ok) return;
+    const data = await response.json();
+    if (data.price && Array.isArray(data.price.services) && data.price.services.length) {
+      S.services = data.price.services.map(s => ({ name: String(s.name || ""), price: String(s.price || "") }));
+      if (data.price.currency) S.currency = data.price.currency;
+      $("currency").value = S.currency;
+      Kit.store.set(KEY, JSON.stringify(S));
+      buildServices(); changed();
+    }
+  } catch (error) {} finally { syncReady = true; }
+}
 
 // ---------- панели ----------
 const design = Kit.designPanel($("design"), S, kind => { if (kind === "theme") fonts.refresh(); changed(); }, { own: "price", self: "price", preview });
@@ -310,7 +340,7 @@ Kit.output({ download: $("download"), share: $("share"), status: $("status") }, 
 // ---------- старт ----------
 $("title").value = S.title; $("subtitle").value = S.subtitle;
 $("prof").value = S.prof; $("currency").value = S.currency; $("watermark").checked = S.watermark;
-buildServices(); tabs.show(tabs.current); changed();
+buildServices(); tabs.show(tabs.current); changed(); syncPrice();
 Promise.all([...fonts.fontsInUse(), '600 84px "Cormorant Garamond"', '128px "Marck Script"', '600 30px "Montserrat"'].map(f => document.fonts.load(f, "Прайс-лист 0123456789")))
   .catch(() => {}).then(() => { changed(); if (tabs.current === "design") design.show(); });
 </script>
