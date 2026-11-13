@@ -71,7 +71,7 @@
           <span class="hint" id="busyHint"></span>
         </section>
 
-        <div id="contacts"></div>
+        
       </div>
 
       <div class="tab" data-tab="design" id="design" hidden></div>
@@ -136,7 +136,7 @@ if (S.start < toIso(new Date())) S.start = toIso(new Date());   // прошед�
 Object.keys(S.free).forEach(d => { if (d < addDays(toIso(new Date()), -1)) delete S.free[d]; });
 const prof = Kit.loadProfile();
 if (S.hideBusy && !("hideBusy" in (Kit.loadJSON("beauty.profile") || {}))) { prof.hideBusy = true; Kit.saveProfile(prof); }   // галка жила в разделе — переносим в кабинет
-S.contacts = Kit.sectionShow(prof, S.contacts);            // что из контактов кабинета показать на картинке окошек
+S.contacts = Kit.defaultShow(prof);            // что из контактов кабинета показать на картинке окошек
 const th = () => Kit.THEMES[S.theme] || Kit.THEMES["windows-0"];
 const base = (k, t) => k === "days" ? { font: "Montserrat", weight: 600, italic: false, caps: false, color: t.ink }
   : k === "times" ? { font: "Montserrat", weight: 500, italic: false, caps: false, color: t.accent } : null;
@@ -498,7 +498,7 @@ $("clearAll").addEventListener("click", () => { dates().forEach(d => delete S.fr
 // ---------- панели ----------
 const design = Kit.designPanel($("design"), S, kind => { if (kind === "theme") fonts.refresh(); changed(); }, { own: "windows", self: "windows", preview });
 const fonts = Kit.fontsPanel($("fonts"), TEXTS, S, style, changed);
-const contacts = Kit.showPanel($("contacts"), prof, S.contacts, changed);
+
 const tabs = Kit.tabs($("tabs"), "windows.tab", name => { if (name === "design") design.show(); });
 
 $("start").addEventListener("change", e => { if (e.target.value) { S.start = e.target.value; openMonths.clear(); buildDays(); changed(); } });
@@ -514,7 +514,7 @@ Kit.output({ download: $("download"), share: $("share"), status: $("status") }, 
   () => `Окошки_${Kit.safeName(prof.master)}_${S.start}.png`,
   () => {
     const err = Kit.profileError(prof) || (dates().some(d => intervals(d).length) ? "" : "Отметьте свободное время хотя бы в одном дне.");
-    if (err) { tabs.show("content"); contacts.focus(err.includes("имя") ? "master" : err.includes("телефон") ? "phone" : ""); }
+    if (err) { tabs.show("content"); }
     return err;
   });
 

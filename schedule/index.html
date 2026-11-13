@@ -422,6 +422,7 @@ function renderList() {
 
 function renderAll() {
   $("masterName").textContent = masterName;
+  $("monthPanel").hidden = false;
   renderStats();
   renderWeek();
   if (monthCursor !== selectedDate.slice(0, 7)) monthCursor = selectedDate.slice(0, 7);
@@ -557,6 +558,7 @@ function showAuth(text) {
   $("daybar").hidden = true;
   $("dayView").hidden = true;
   $("listView").hidden = true;
+  $("monthPanel").hidden = true;
 }
 
 function setup() {
