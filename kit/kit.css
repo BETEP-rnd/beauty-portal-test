@@ -269,5 +269,4 @@ header.top nav { grid-area: nav; }
 }
 
 /* прозрачная шапка: виден фон страницы */
-header.top { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; transition: none; }
-header.top.scrolled { background: color-mix(in srgb, var(--page-bg, var(--bg)) 42%, transparent); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); box-shadow: 0 1px 0 var(--line); }
+header.top { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
