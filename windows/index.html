@@ -78,7 +78,6 @@
       <div class="tab" data-tab="fonts" id="fonts" hidden></div>
 
       <section class="group">
-        <label class="check"><input type="checkbox" id="watermark"> Водяной знак «ОБРАЗЕЦ»</label>
         <div class="btnrow">
           <button class="btn" type="button" id="download">Скачать картинку</button>
           <button class="btn ghost" type="button" id="share" hidden>Отправить</button>
@@ -401,7 +400,6 @@ function render(t, F, P) {                                  // сама карт
   if (!all.some(d => d.iv.length) && lay !== "calendar") dr.centered("Отметьте свободное время", W / 2, (top + bottom) / 2, '400 30px "Montserrat"', t.muted);
   else ({ list: drawList, week: drawWeek, starts: drawStarts, calendar: drawCalendar }[lay] || drawList)(top, bottom, days, t, P);
   foot.draw(footTop);
-  if (S.watermark) dr.watermark(t, H);
 }
 let raf = 0;
 function changed() { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); Kit.store.set(KEY, JSON.stringify(S)); hints(); }
@@ -507,7 +505,6 @@ $("ndays").addEventListener("change", e => { S.ndays = /^m/.test(e.target.value)
 ["dayStart", "dayEnd"].forEach(id => $(id).addEventListener("change", e => { if (e.target.value) { S[id] = e.target.value; buildDays(); changed(); } }));
 ["title", "subtitle"].forEach(id => $(id).addEventListener("input", e => { S[id] = e.target.value; changed(); }));
 $("layout").addEventListener("click", e => { const b = e.target.closest("[data-k]"); if (!b) return; S.layout = b.dataset.k; Kit.press($("layout"), S.layout); changed(); });
-$("watermark").addEventListener("change", e => { S.watermark = e.target.checked; changed(); });
 
 // ---------- сохранить и отправить ----------
 Kit.output({ download: $("download"), share: $("share"), status: $("status") }, canvas, draw,
@@ -539,7 +536,7 @@ async function loadBusy() {
 $("start").value = S.start; $("start").min = toIso(new Date());
 ["ndays", "step", "minLen"].forEach(id => $(id).value = String(S[id]));
 ["dayStart", "dayEnd", "title", "subtitle"].forEach(id => $(id).value = S[id]);
-$("watermark").checked = S.watermark; Kit.press($("layout"), S.layout);
+Kit.press($("layout"), S.layout);
 buildDays(); tabs.show(tabs.current); changed(); loadBusy();
 Promise.all([...fonts.fontsInUse(), '600 84px "Cormorant Garamond"', '128px "Marck Script"', '600 30px "Montserrat"'].map(f => document.fonts.load(f, "Свободные окошки 0123456789")))
   .catch(() => {}).then(() => { changed(); if (tabs.current === "design") design.show(); });
