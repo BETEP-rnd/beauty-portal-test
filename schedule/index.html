@@ -60,14 +60,14 @@
   .free-layer { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
   .free-layer .free { position: absolute; left: 0; right: 0; background: color-mix(in srgb, var(--ok) 8%, transparent); border-left: 2px solid color-mix(in srgb, var(--ok) 45%, transparent); }
   .appts { position: absolute; inset: 0; z-index: 2; }
-  .appt-block { position: absolute; display: flex; flex-direction: column; gap: 1px; overflow: hidden; padding: 6px 8px; border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); font: inherit; text-align: left; cursor: pointer; box-shadow: 0 2px 6px rgba(40, 25, 15, .06); }
+  .appt-block { position: absolute; display: flex; flex-direction: column; gap: 1px; overflow: hidden; padding: 6px 8px; border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--accent); font: inherit; text-align: left; cursor: pointer; box-shadow: 0 2px 6px rgba(40, 25, 15, .06); }
   .appt-block.pending { border-color: var(--accent); border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
   .appt-block.confirmed { border-color: color-mix(in srgb, var(--ok) 55%, var(--line)); border-left-color: var(--ok); background: color-mix(in srgb, var(--ok) 8%, var(--panel)); }
   .appt-block.manual { border-left-color: var(--muted); }
   .appt-block.declined, .appt-block.expired { opacity: .55; }
-  .appt-block .t { overflow: hidden; color: var(--muted); font-size: 11px; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .appt-block .t { overflow: hidden; color: var(--accent); font-size: 11px; font-weight: 500; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .appt-block b { overflow: hidden; font-size: 14px; font-weight: 600; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
-  .appt-block .s { overflow: hidden; color: var(--muted); font-size: 11.5px; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; }
+  .appt-block .s { overflow: hidden; color: var(--accent); font-size: 11.5px; font-weight: 500; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; }
   .appt-block .src { position: absolute; top: 4px; right: 6px; color: var(--accent); font-size: 8.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
   .appt-block.manual .src { color: var(--muted); }
   .now-line { position: absolute; left: 0; right: 0; z-index: 4; height: 1px; background: var(--accent); pointer-events: none; }
