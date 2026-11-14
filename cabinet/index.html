@@ -2,6 +2,29 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
+<script>
+(function () {
+  try {
+    var build = "202611151200";
+    if (localStorage.getItem("beauty.build") === build) return;
+    localStorage.setItem("beauty.build", build);
+    var jobs = [];
+    if ("serviceWorker" in navigator && navigator.serviceWorker.getRegistrations) {
+      jobs.push(navigator.serviceWorker.getRegistrations().then(function (regs) {
+        return Promise.all(regs.map(function (reg) { return reg.unregister(); }));
+      }));
+    }
+    if (window.caches) {
+      jobs.push(caches.keys().then(function (keys) {
+        return Promise.all(keys.map(function (key) { return caches.delete(key); }));
+      }));
+    }
+    if (!jobs.length) return;
+    Promise.all(jobs).catch(function () {}).then(function () { location.reload(); });
+  } catch (error) {}
+})();
+</script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f8f2ec">
 <meta name="application-name" content="Мастерфолио">
@@ -14,7 +37,7 @@
 <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
 <title>Личный кабинет — Мастерфолио</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500&family=Manrope:wght@400;500;600;700&family=Montserrat:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="../kit/kit.css?v=202611150900">
+<link rel="stylesheet" href="../kit/kit.css?v=202611151200">
 <script>try { var u = localStorage.getItem("beauty.ui"); if (u) document.documentElement.dataset.ui = u; } catch (e) {}</script>
 <style>
   /* Кабинет: слева приветствие и разделы, справа «Мои данные»; на телефоне — друг под другом. */
@@ -100,12 +123,13 @@
       </div>
     </div>
     <div class="panel me" id="me"></div>
+    <div class="hint" id="syncStatus" hidden></div>
   </div>
 </div>
 
 <script src="../kit/backgrounds.js?v=202611110807"></script>
 <script src="../kit/trends.js?v=202611110807"></script>
-<script src="../kit/kit.js?v=202611150900"></script>
+<script src="../kit/kit.js?v=202611151200"></script>
 <script>
 const API_URL = "https://api.masterfolio.ru";
 (async () => {
@@ -146,6 +170,20 @@ if (want === "email" || want === "hideBusy") panel.focus(want);
 else if (prof.soc[want]) panel.focus(prof.soc[want].val.trim() || want === "wa" ? want + "-on" : "soc-" + want);
 Kit.saveProfile(prof, true);                                   // данные по умолчанию сразу видны и в разделах
 hello();
+window.addEventListener("kit:sync", event => {
+  const el = document.getElementById("syncStatus");
+  if (!el) return;
+  const messages = {
+    guest: "Войдите в аккаунт, чтобы загрузить настройки.",
+    pulled: "Настройки загружены с аккаунта.",
+    pushed: "Настройки сохранены в аккаунт.",
+    synced: "Настройки синхронизированы с аккаунтом.",
+    empty: "На аккаунте пока нет сохранённых настроек.",
+    error: "Не удалось связаться с сервером."
+  };
+  el.textContent = messages[event.detail] || "";
+  el.hidden = !el.textContent;
+});
 const schedSaved = Kit.loadJSON("schedule.v1") || {}, schedWin = Kit.loadJSON("windows.v1") || {};
 $("schedStart").value = schedSaved.start || schedWin.dayStart || "08:00";
 $("schedEnd").value = schedSaved.end || schedWin.dayEnd || "22:00";
@@ -237,6 +275,6 @@ if (params.get("yandex") === "ok") {
 }
 })();
 </script>
-<script src="../kit/pwa.js?v=202611150900"></script>
+<script src="../kit/pwa.js?v=202611151200"></script>
 </body>
 </html>

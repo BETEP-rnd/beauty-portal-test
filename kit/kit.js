@@ -176,6 +176,10 @@
     return JSON.stringify(value);
   }
 
+  function syncEvent(status) {
+    try { window.dispatchEvent(new CustomEvent("kit:sync", { detail: status })); } catch (error) {}
+  }
+
   function applySyncData(data) {
     syncApplying = true;
     try {
@@ -197,7 +201,7 @@
   async function pushSync() {
     if (syncBusy) return;
     const data = syncData();
-    if (!hasSyncData(data)) { rawSet("beauty.sync.dirty", "0"); return; }
+    if (!hasSyncData(data)) { rawSet("beauty.sync.dirty", "0"); syncEvent("empty"); return; }
     syncBusy = true;
     try {
       const response = await fetch(API_URL + "/api/profile", {
@@ -209,7 +213,8 @@
       if (response.ok) {
         rawSet("beauty.sync.dirty", "0");
         rawSet("beauty.sync.at", String(Date.now()));
-      }
+        syncEvent("pushed");
+      } else syncEvent(response.status === 401 ? "guest" : "error");
     } catch (error) {
     } finally {
       syncBusy = false;
@@ -229,10 +234,12 @@
       response = await fetch(API_URL + "/api/profile", { credentials: "include" });
     } catch (error) {
       syncReady = true;
+      syncEvent("error");
       return;
     }
     if (!response.ok) {
       syncReady = true;
+      syncEvent(response.status === 401 ? "guest" : "error");
       return;
     }
     let data;
@@ -240,6 +247,7 @@
       data = await response.json();
     } catch (error) {
       syncReady = true;
+      syncEvent("error");
       return;
     }
     const server = {};
@@ -260,7 +268,7 @@
     }
     if (!Object.keys(server).length) {
       syncReady = true;
-      if (hasSyncData(local)) await pushSync();
+      if (hasSyncData(local)) await pushSync(); else syncEvent("empty");
       return;
     }
     const merged = {};
@@ -273,6 +281,7 @@
     if (Object.keys(mergedSettings).length) merged.settings = mergedSettings;
     const localText = stable(local), mergedText = stable(merged), serverText = stable(server);
     if (localText !== mergedText) {
+      syncEvent("pulled");
       applySyncData(merged);
       if (mergedText !== serverText) await pushSync();
       location.reload();
@@ -284,6 +293,7 @@
       return;
     }
     syncReady = true;
+    syncEvent("synced");
   }
 
   if (document.readyState === "complete") setTimeout(pullSync, 0);

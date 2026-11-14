@@ -1,4 +1,4 @@
-const CACHE = "mf-v202611150900";
+const CACHE = "mf-v202611151200";
 const BASE = new URL("./", self.location).href;
 const CORE = [
   "", "index.html", "auth/", "booking/", "cabinet/", "certs/", "clients/", "price/", "schedule/", "windows/",
