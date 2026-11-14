@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f8f2ec">
+<title>Диагностика синхронизации — Мастерфолио</title>
+<style>
+  :root { color-scheme: light; --bg:#f8f2ec; --panel:#fffaf6; --line:#d9c3b8; --text:#2b1a1a; --muted:#7d6a63; --accent:#6e1f2e; --ok:#4f7f45; --bad:#b8483a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 20px; background: var(--bg); color: var(--text); font-family: "Manrope", "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+  h1 { margin: 0; font-family: Georgia, serif; font-size: 30px; font-weight: 500; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+  .verdict { border-left: 4px solid var(--accent); font-size: 15px; line-height: 1.55; }
+  .verdict.ok { border-color: var(--ok); }
+  .verdict.bad { border-color: var(--bad); }
+  dl { display: grid; grid-template-columns: minmax(160px, 1fr) 2fr; gap: 8px 16px; margin: 0; font-size: 14px; }
+  dt { color: var(--muted); }
+  dd { margin: 0; word-break: break-word; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  input { width: 100%; margin-top: 6px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--text); font: inherit; font-size: 14px; padding: 9px 11px; }
+  button { border: 1px solid var(--line); border-radius: 99px; background: var(--panel); color: var(--text); font: inherit; font-size: 13px; padding: 9px 14px; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .45; cursor: default; }
+  .status { min-height: 20px; font-size: 13px; color: var(--muted); }
+  .hint { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Диагностика синхронизации</h1>
+  <div class="card verdict" id="verdict">Проверяю…</div>
+  <div class="card"><dl id="report"></dl></div>
+  <div class="card">
+    <label class="hint" for="bookingUrl">Если настройки публиковались, вставь ссылку на страницу записи. Из неё можно вернуть профиль, прайс и свободные окна.</label>
+    <input id="bookingUrl" type="url" inputmode="url" placeholder="https://…/booking/?m=…">
+    <div class="actions" style="margin-top:10px"><button id="restore">Восстановить из опубликованной страницы</button></div>
+  </div>
+  <div class="card actions">
+    <button class="primary" id="load">Загрузить с сервера</button>
+    <button id="send">Отправить локальные настройки</button>
+    <button id="refresh">Проверить снова</button>
+    <button id="clear">Очистить кэш приложения</button>
+  </div>
+  <div class="status" id="status"></div>
+  <div class="card hint">Страница только для проверки. Она не показывает пароль и не отправляет данные на сторонние сервисы. «Загрузить с сервера» заменит настройки в этом браузере настройками из аккаунта. «Отправить» сохранит текущие настройки этого браузера в аккаунт.</div>
+</main>
+<script>
+const API = "https://api.masterfolio.ru";
+const $ = id => document.getElementById(id);
+const readJSON = key => { try { return JSON.parse(localStorage.getItem(key) || "null"); } catch (e) { return null; } };
+function profileHasData(p) {
+  if (!p || typeof p !== "object") return false;
+  if (String(p.master || "").trim() || String(p.phone || "").trim() || String(p.email || "").trim()) return true;
+  if (String(p.qr || "none") !== "none" || String(p.bookingSlug || "").trim()) return true;
+  return Object.keys(p.soc || {}).some(k => p.soc[k] && (p.soc[k].on || String(p.soc[k].val || "").trim()));
+}
+function localData() {
+  const profile = readJSON("beauty.profile");
+  const settings = {};
+  const windows = readJSON("windows.v1");
+  const schedule = readJSON("schedule.v1");
+  const clients = readJSON("beauty.clients");
+  if (windows && Object.keys(windows).length) settings.windows = windows;
+  if (schedule && Object.keys(schedule).length) settings.schedule = schedule;
+  if (clients && Object.keys(clients).length) settings.clients = clients;
+  const data = {};
+  if (profileHasData(profile)) data.profile = profile;
+  if (Object.keys(settings).length) data.settings = settings;
+  return data;
+}
+let state = {};
+function esc(value) { return String(value).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function render() {
+  const rows = [
+    ["Адрес", location.href],
+    ["Режим", state.standalone ? "установленное приложение" : "браузер"],
+    ["Сборка", state.build || "нет"],
+    ["Аккаунт", state.authStatus === 200 ? "вход выполнен" : state.authStatus ? "HTTP " + state.authStatus : "ошибка сети"],
+    ["Профиль на сервере", state.profileStatus === 200 ? (state.serverProfile ? "есть" : "пусто") : state.profileStatus ? "HTTP " + state.profileStatus : "ошибка сети"],
+    ["Настройки на сервере", state.profileStatus === 200 ? (state.serverSettings ? "есть" : "пусто") : "—"],
+    ["Профиль в браузере", state.localProfile ? "есть" : "пусто"],
+    ["Окна, график, клиенты", [state.localWindows && "окна", state.localSchedule && "график", state.localClients && "клиенты"].filter(Boolean).join(", ") || "пусто"],
+    ["Очередь отправки", state.dirty === "1" ? "есть неотправленные изменения" : "нет"],
+    ["Service worker", state.swController || "не управляет страницей"],
+    ["Кэши", state.caches.length ? state.caches.join(", ") : "нет"]
+  ];
+  $("report").innerHTML = rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+}
+async function inspect() {
+  const profile = readJSON("beauty.profile");
+  state = {
+    build: (() => { try { return localStorage.getItem("beauty.build"); } catch (e) { return null; } })(),
+    standalone: matchMedia("(display-mode: standalone)").matches || navigator.standalone === true,
+    localProfile: profileHasData(profile),
+    localWindows: !!readJSON("windows.v1"),
+    localSchedule: !!readJSON("schedule.v1"),
+    localClients: !!readJSON("beauty.clients"),
+    dirty: (() => { try { return localStorage.getItem("beauty.sync.dirty"); } catch (e) { return null; } })(),
+    swController: navigator.serviceWorker && navigator.serviceWorker.controller ? navigator.serviceWorker.controller.scriptURL : "",
+    caches: window.caches ? await caches.keys() : [],
+    authStatus: 0,
+    profileStatus: 0,
+    serverProfile: false,
+    serverSettings: false
+  };
+  try {
+    const response = await fetch(API + "/api/auth/me", { credentials: "include" });
+    state.authStatus = response.status;
+  } catch (error) {}
+  try {
+    const response = await fetch(API + "/api/profile", { credentials: "include" });
+    state.profileStatus = response.status;
+    if (response.ok) {
+      const body = await response.json();
+      state.serverProfile = !!(body.profile && profileHasData(body.profile));
+      state.serverSettings = !!(body.settings && Object.keys(body.settings).length);
+    }
+  } catch (error) {}
+  render();
+  const verdict = $("verdict");
+  const local = state.localProfile || state.localWindows || state.localSchedule || state.localClients;
+  if (state.authStatus === 401) {
+    verdict.className = "card verdict bad";
+    verdict.textContent = "В этом приложении вы не вошли в аккаунт. Сервер не отдаёт настройки без входа. Войдите в кабинет и нажмите «Проверить снова».";
+  } else if (state.authStatus !== 200) {
+    verdict.className = "card verdict bad";
+    verdict.textContent = "Не удалось проверить аккаунт. Проверьте интернет и откройте страницу ещё раз.";
+  } else if (!state.serverProfile && !state.serverSettings && !local) {
+    verdict.className = "card verdict bad";
+    verdict.textContent = "Вы вошли, но настроек нет ни на сервере, ни в этом браузере. Заполните кабинет заново или откройте страницу в браузере, где настройки уже были.";
+  } else if (!state.serverProfile && !state.serverSettings && local) {
+    verdict.className = "card verdict bad";
+    verdict.textContent = "Настройки есть в этом браузере, но на сервере их нет. Нажмите «Отправить локальные настройки», чтобы сохранить их в аккаунт.";
+  } else {
+    verdict.className = "card verdict ok";
+    verdict.textContent = "На сервере есть настройки. Нажмите «Загрузить с сервера», чтобы применить их в этом браузере.";
+  }
+  $("load").disabled = !(state.serverProfile || state.serverSettings);
+  $("send").disabled = !local || state.authStatus !== 200;
+}
+async function loadFromServer() {
+  $("status").textContent = "Загружаю…";
+  const response = await fetch(API + "/api/profile", { credentials: "include" });
+  if (!response.ok) { $("status").textContent = "Сервер ответил " + response.status; return; }
+  const body = await response.json();
+  try {
+    if (body.profile) localStorage.setItem("beauty.profile", JSON.stringify(body.profile)); else localStorage.removeItem("beauty.profile");
+    if (body.settings && body.settings.windows) localStorage.setItem("windows.v1", JSON.stringify(body.settings.windows)); else localStorage.removeItem("windows.v1");
+    if (body.settings && body.settings.schedule) localStorage.setItem("schedule.v1", JSON.stringify(body.settings.schedule)); else localStorage.removeItem("schedule.v1");
+    if (body.settings && body.settings.clients) localStorage.setItem("beauty.clients", JSON.stringify(body.settings.clients)); else localStorage.removeItem("beauty.clients");
+    localStorage.removeItem("beauty.sync.dirty");
+  } catch (error) {}
+  location.reload();
+}
+async function sendToServer() {
+  const data = localData();
+  if (!data.profile && !data.settings) { $("status").textContent = "В этом браузере нечего отправлять."; return; }
+  $("status").textContent = "Отправляю…";
+  const response = await fetch(API + "/api/profile", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+  if (!response.ok) { $("status").textContent = "Сервер ответил " + response.status; return; }
+  try { localStorage.removeItem("beauty.sync.dirty"); } catch (error) {}
+  $("status").textContent = "Сохранено в аккаунт. Перезагружаю…";
+  setTimeout(() => location.reload(), 500);
+}
+async function clearAppCache() {
+  $("status").textContent = "Очищаю кэш…";
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(reg => reg.unregister()));
+    }
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(key => caches.delete(key)));
+    }
+    localStorage.removeItem("beauty.build");
+  } catch (error) {}
+  location.reload();
+}
+async function restorePublished() {
+  const value = $("bookingUrl").value.trim();
+  if (!value) { $("status").textContent = "Вставь ссылку на опубликованную страницу записи."; return; }
+  let slug = value;
+  try { slug = new URL(value).searchParams.get("m") || value; } catch (error) {}
+  if (!slug) { $("status").textContent = "В ссылке нет кода страницы записи."; return; }
+  $("status").textContent = "Ищу опубликованные данные…";
+  const response = await fetch(API + "/api/booking/public/" + encodeURIComponent(slug));
+  if (!response.ok) { $("status").textContent = "Страница записи не найдена: HTTP " + response.status; return; }
+  const data = await response.json();
+  const restored = [];
+  try {
+    if (data.profile) {
+      localStorage.setItem("beauty.profile", JSON.stringify(data.profile));
+      restored.push("профиль");
+    }
+    if (data.price && Array.isArray(data.price.services)) {
+      const local = readJSON("price.v1") || {};
+      localStorage.setItem("price.v1", JSON.stringify({ ...local, services: data.price.services, currency: data.price.currency || local.currency }));
+      restored.push("прайс");
+    }
+    if (data.windows) {
+      const local = readJSON("windows.v1") || {};
+      localStorage.setItem("windows.v1", JSON.stringify({ ...local, ...data.windows }));
+      restored.push("окна");
+    }
+    localStorage.removeItem("beauty.sync.dirty");
+  } catch (error) {}
+  $("status").textContent = restored.length ? "Восстановлено: " + restored.join(", ") + ". Перезагружаю…" : "В опубликованной странице нет данных.";
+  if (restored.length) setTimeout(() => location.reload(), 700);
+}
+
+$("load").addEventListener("click", loadFromServer);
+$("send").addEventListener("click", sendToServer);
+$("restore").addEventListener("click", restorePublished);
+$("refresh").addEventListener("click", () => location.reload());
+$("clear").addEventListener("click", clearAppCache);
+inspect().catch(error => { $("verdict").textContent = "Ошибка проверки: " + error.message; });
+</script>
+</body>
+</html>
