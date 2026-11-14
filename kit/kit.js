@@ -126,7 +126,170 @@
     p.qrSize = ["mini", "medium", "max"].includes(saved.qrSize) ? saved.qrSize : "medium";
     return p;
   }
-  const saveProfile = p => store.set(PROFILE_KEY, JSON.stringify(p));
+  const saveProfile = (p, silent) => {
+    if (silent) { try { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); } catch (e) {} }
+    else store.set(PROFILE_KEY, JSON.stringify(p));
+  };
+
+  // синхронизация настроек с аккаунтом: профиль, окна, график и клиенты
+  const SYNC_KEYS = new Set(["beauty.profile", "windows.v1", "schedule.v1", "beauty.clients"]);
+  let syncReady = false, syncStarted = false, syncBusy = false, syncApplying = false, syncTimer = 0;
+  const rawSet = store.set.bind(store);
+  const rawRemove = k => { try { localStorage.removeItem(k); } catch (e) {} };
+  store.set = function (k, v) {
+    rawSet(k, v);
+    if (!syncApplying && syncReady && SYNC_KEYS.has(k)) queueSync();
+  };
+
+  function hasProfileData(p) {
+    if (!p || typeof p !== "object") return false;
+    if (String(p.master || "").trim() || String(p.phone || "").trim() || String(p.email || "").trim()) return true;
+    if (String(p.qr || "none") !== "none" || String(p.bookingSlug || "").trim()) return true;
+    if (p.qrSize && p.qrSize !== "medium") return true;
+    if (p.socLayout && p.socLayout !== "row") return true;
+    if (p.qrBare || p.hideBusy) return true;
+    return Object.keys(p.soc || {}).some(k => p.soc[k] && (p.soc[k].on || String(p.soc[k].val || "").trim()));
+  }
+
+  function syncData() {
+    const data = {};
+    const profile = loadJSON(PROFILE_KEY);
+    if (hasProfileData(profile)) data.profile = profile;
+    const settings = {};
+    const windows = loadJSON("windows.v1");
+    const schedule = loadJSON("schedule.v1");
+    const clients = loadJSON("beauty.clients");
+    if (windows && Object.keys(windows).length) settings.windows = windows;
+    if (schedule && Object.keys(schedule).length) settings.schedule = schedule;
+    if (clients && Object.keys(clients).length) settings.clients = clients;
+    if (Object.keys(settings).length) data.settings = settings;
+    return data;
+  }
+
+  function hasSyncData(data) {
+    return !!(data && (data.profile || (data.settings && Object.keys(data.settings).length)));
+  }
+
+  function stable(value) {
+    if (Array.isArray(value)) return "[" + value.map(stable).join(",") + "]";
+    if (value && typeof value === "object") return "{" + Object.keys(value).sort().map(k => JSON.stringify(k) + ":" + stable(value[k])).join(",") + "}";
+    return JSON.stringify(value);
+  }
+
+  function applySyncData(data) {
+    syncApplying = true;
+    try {
+      if (data.profile) rawSet(PROFILE_KEY, JSON.stringify(data.profile)); else rawRemove(PROFILE_KEY);
+      if (data.settings && data.settings.windows) rawSet("windows.v1", JSON.stringify(data.settings.windows)); else rawRemove("windows.v1");
+      if (data.settings && data.settings.schedule) rawSet("schedule.v1", JSON.stringify(data.settings.schedule)); else rawRemove("schedule.v1");
+      if (data.settings && data.settings.clients) rawSet("beauty.clients", JSON.stringify(data.settings.clients)); else rawRemove("beauty.clients");
+    } finally {
+      syncApplying = false;
+    }
+  }
+
+  function queueSync() {
+    rawSet("beauty.sync.dirty", "1");
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(pushSync, 700);
+  }
+
+  async function pushSync() {
+    if (syncBusy) return;
+    const data = syncData();
+    if (!hasSyncData(data)) { rawSet("beauty.sync.dirty", "0"); return; }
+    syncBusy = true;
+    try {
+      const response = await fetch(API_URL + "/api/profile", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+      if (response.ok) {
+        rawSet("beauty.sync.dirty", "0");
+        rawSet("beauty.sync.at", String(Date.now()));
+      }
+    } catch (error) {
+    } finally {
+      syncBusy = false;
+    }
+  }
+
+  async function pullSync() {
+    if (syncStarted) return;
+    syncStarted = true;
+    if (store.get("beauty.sync.dirty") === "1") {
+      syncReady = true;
+      await pushSync();
+      return;
+    }
+    let response;
+    try {
+      response = await fetch(API_URL + "/api/profile", { credentials: "include" });
+    } catch (error) {
+      syncReady = true;
+      return;
+    }
+    if (!response.ok) {
+      syncReady = true;
+      return;
+    }
+    let data;
+    try {
+      data = await response.json();
+    } catch (error) {
+      syncReady = true;
+      return;
+    }
+    const server = {};
+    if (hasProfileData(data.profile)) server.profile = data.profile;
+    if (data.settings && typeof data.settings === "object") {
+      const clean = {};
+      ["windows", "schedule", "clients"].forEach(k => {
+        const value = data.settings[k];
+        if (Array.isArray(value) ? value.length : (value && typeof value === "object" && Object.keys(value).length)) clean[k] = value;
+      });
+      if (Object.keys(clean).length) server.settings = clean;
+    }
+    const local = syncData();
+    if (store.get("beauty.sync.dirty") === "1") {
+      syncReady = true;
+      await pushSync();
+      return;
+    }
+    if (!Object.keys(server).length) {
+      syncReady = true;
+      if (hasSyncData(local)) await pushSync();
+      return;
+    }
+    const merged = {};
+    if (server.profile || local.profile) merged.profile = server.profile || local.profile;
+    const mergedSettings = {};
+    ["windows", "schedule", "clients"].forEach(k => {
+      const value = (server.settings && server.settings[k]) || (local.settings && local.settings[k]);
+      if (value) mergedSettings[k] = value;
+    });
+    if (Object.keys(mergedSettings).length) merged.settings = mergedSettings;
+    const localText = stable(local), mergedText = stable(merged), serverText = stable(server);
+    if (localText !== mergedText) {
+      applySyncData(merged);
+      if (mergedText !== serverText) await pushSync();
+      location.reload();
+      return;
+    }
+    if (mergedText !== serverText) {
+      syncReady = true;
+      await pushSync();
+      return;
+    }
+    syncReady = true;
+  }
+
+  if (document.readyState === "complete") setTimeout(pullSync, 0);
+  else addEventListener("load", pullSync, { once: true });
+
+
 
   // ---------- стили текста ----------
   function baseStyle(k, t) {                                    // общие элементы; разделы дополняют своими
