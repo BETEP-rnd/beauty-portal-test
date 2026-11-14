@@ -10,6 +10,7 @@ const PORT = Number(process.env.PORT || 3000);
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
 const BODY_LIMIT = 16 * 1024;
 const PUBLISH_BODY_LIMIT = 512 * 1024;
+const PROFILE_BODY_LIMIT = 2 * 1024 * 1024;
 const ALLOWED_ORIGINS = new Set((process.env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean));
 const YANDEX_CLIENT_ID = process.env.YANDEX_CLIENT_ID || "";
 const YANDEX_CLIENT_SECRET = process.env.YANDEX_CLIENT_SECRET || "";
@@ -159,6 +160,30 @@ async function priceSave(req, res) {
   const currency = String(price.currency || "руб.").trim().slice(0, 10) || "руб.";
   await pool.query("UPDATE masters SET price = $1::jsonb WHERE id = $2", [JSON.stringify({ services, currency }), master.id]);
   json(res, 200, { price: { services, currency } });
+}
+
+async function profileGet(req, res) {
+  const master = await requireMaster(req);
+  const result = await pool.query("SELECT profile, settings FROM masters WHERE id = $1", [master.id]);
+  const row = result.rows[0] || {};
+  json(res, 200, { profile: row.profile || null, settings: row.settings || null });
+}
+
+async function profileSave(req, res) {
+  const master = await requireMaster(req);
+  const data = await body(req, PROFILE_BODY_LIMIT);
+  const current = await pool.query("SELECT profile, settings FROM masters WHERE id = $1", [master.id]);
+  const row = current.rows[0] || {};
+  const profile = data.profile === undefined ? row.profile : data.profile;
+  const settings = data.settings === undefined ? row.settings : data.settings;
+  for (const [name, value] of [["profile", profile], ["settings", settings]]) {
+    if (value !== null && (typeof value !== "object" || Array.isArray(value))) throw new HttpError(400, `Некорректные ${name}.`);
+  }
+  const profileText = JSON.stringify(profile === undefined ? null : profile);
+  const settingsText = JSON.stringify(settings === undefined ? null : settings);
+  if (profileText.length + settingsText.length > PROFILE_BODY_LIMIT) throw new HttpError(413, "Слишком большой профиль.");
+  await pool.query("UPDATE masters SET profile = $1::jsonb, settings = $2::jsonb WHERE id = $3", [profileText, settingsText, master.id]);
+  json(res, 200, { profile: profile === undefined ? null : profile, settings: settings === undefined ? null : settings });
 }
 
 function rateLimit(req, route) {
@@ -1084,6 +1109,8 @@ async function handle(req, res) {
   }
   if (url.pathname === "/api/price" && req.method === "GET") return await priceGet(req, res);
   if (url.pathname === "/api/price" && req.method === "POST") { rateLimit(req, "price-save"); return await priceSave(req, res); }
+  if (url.pathname === "/api/profile" && req.method === "GET") return await profileGet(req, res);
+  if (url.pathname === "/api/profile" && req.method === "POST") { rateLimit(req, "profile-save"); return await profileSave(req, res); }
   if (url.pathname === "/api/booking/publish" && req.method === "POST") { rateLimit(req, "booking-publish"); return await bookingPublish(req, res); }
   if (url.pathname.startsWith("/api/booking/public/") && req.method === "GET") { rateLimit(req, "booking-public"); return await bookingPublic(req, res, url.pathname.slice("/api/booking/public/".length)); }
   if (url.pathname === "/api/booking/request" && req.method === "POST") { rateLimit(req, "booking-request"); return await bookingRequest(req, res); }
