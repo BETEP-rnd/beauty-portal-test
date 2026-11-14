@@ -270,3 +270,8 @@ header.top nav { grid-area: nav; }
 
 /* прозрачная шапка: виден фон страницы */
 header.top { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
+
+/* установка PWA */
+#pwaInstall { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 80; border: 1px solid var(--accent); border-radius: 99px; background: var(--accent); color: var(--accent-ink); font: inherit; font-size: 13px; font-weight: 600; padding: 11px 18px; box-shadow: 0 10px 30px rgba(0,0,0,.18); cursor: pointer; }
+#pwaInstall:hover { filter: brightness(1.05); }
+@media (max-width: 520px) { #pwaInstall { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); font-size: 12.5px; padding: 10px 15px; } }
