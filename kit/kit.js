@@ -221,6 +221,22 @@
     }
   }
 
+  function reloadOnce() {
+    try {
+      const key = "beauty.sync.reloaded";
+      if (sessionStorage.getItem(key) === "1") {
+        syncReady = true;
+        syncEvent("synced");
+        return;
+      }
+      sessionStorage.setItem(key, "1");
+    } catch (error) {
+      syncReady = true;
+      return;
+    }
+    location.reload();
+  }
+
   async function pullSync() {
     if (syncStarted) return;
     syncStarted = true;
@@ -284,7 +300,7 @@
       syncEvent("pulled");
       applySyncData(merged);
       if (mergedText !== serverText) await pushSync();
-      location.reload();
+      reloadOnce();
       return;
     }
     if (mergedText !== serverText) {
@@ -838,6 +854,7 @@
       const saved = loadJSON(PROFILE_KEY);
       if (!saved || profileFingerprint(saved.master, saved.phone) !== LEGACY_PRESET_FINGERPRINT) return;
       if (localStorage.getItem("beauty.presetCleared")) return;
+      try { localStorage.setItem("beauty.profile.backup", JSON.stringify(saved)); } catch (error) {}
       localStorage.removeItem(PROFILE_KEY);
       localStorage.setItem("beauty.presetCleared", "1");
     } catch (error) {}
@@ -912,6 +929,7 @@
           try { owner = localStorage.getItem(PROFILE_OWNER_KEY); } catch (error) {}
           const changedAccount = (Boolean(accountId) && accountId !== String(master.id)) || (Boolean(owner) && owner !== String(master.id));
           if (changedAccount) {
+            try { localStorage.setItem("beauty.profile.backup", JSON.stringify(profile)); } catch (error) {}
             profile.master = master.name || "";
             profile.phone = maskPhone(master.phone || "");
             profile.email = master.email || "";
