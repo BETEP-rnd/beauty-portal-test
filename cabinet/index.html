@@ -5,7 +5,7 @@
 <script>
 (function () {
   try {
-    var build = "202611151400";
+    var build = "202611151500";
     if (localStorage.getItem("beauty.build") === build) return;
     localStorage.setItem("beauty.build", build);
     var jobs = [];
@@ -37,7 +37,7 @@
 <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
 <title>Личный кабинет — Мастерфолио</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500&family=Manrope:wght@400;500;600;700&family=Montserrat:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="../kit/kit.css?v=202611151400">
+<link rel="stylesheet" href="../kit/kit.css?v=202611151500">
 <script>try { var u = localStorage.getItem("beauty.ui"); if (u) document.documentElement.dataset.ui = u; } catch (e) {}</script>
 <style>
   /* Кабинет: слева приветствие и разделы, справа «Мои данные»; на телефоне — друг под другом. */
@@ -100,6 +100,12 @@
         <div class="who" id="who"></div>
         <div class="facts" id="facts"></div>
       </div>
+      <div class="card plan" id="planCard" hidden>
+        <b id="planTitle">Тариф</b>
+        <span class="plan-meta" id="planMeta">Загрузка…</span>
+        <div class="hint plan-note" id="planNote"></div>
+        <a class="plan-admin" id="adminLink" href="../admin/" hidden>Открыть админ-панель</a>
+      </div>
       <div class="card" id="scheduleRangeCard">
         <b>Период работы в графике</b>
         <span>Какие часы показывать в «Графике работы». Записи вне периода тоже будут видны.</span>
@@ -129,17 +135,19 @@
 
 <script src="../kit/backgrounds.js?v=202611110807"></script>
 <script src="../kit/trends.js?v=202611110807"></script>
-<script src="../kit/kit.js?v=202611151400"></script>
+<script src="../kit/kit.js?v=202611151500"></script>
 <script>
 const API_URL = "https://api.masterfolio.ru";
 (async () => {
 const params = new URLSearchParams(location.search);
 const prof = Kit.loadProfile(), $ = id => document.getElementById(id);
 let signedIn = false;
+let access = null;
 try {
   const response = await fetch(API_URL + "/api/auth/me", { credentials: "include" });
   if (response.ok) {
     const data = await response.json();
+    access = data && data.access || null;
     const master = data && data.master;
     if (master) {
       signedIn = true;
@@ -162,6 +170,43 @@ function hello() {
   $("who").textContent = prof.master.trim() || "Имя мастера";
   $("facts").innerHTML = Kit.contactsHtml(prof);
 }
+function fmtPlanDate(value) {
+  if (!value) return "";
+  try { return new Intl.DateTimeFormat("ru-RU").format(new Date(value)); } catch (error) { return ""; }
+}
+function renderPlan() {
+  const card = $("planCard");
+  if (!card) return;
+  if (!access) { card.hidden = true; return; }
+  card.hidden = false;
+  const title = $("planTitle"), meta = $("planMeta"), note = $("planNote"), admin = $("adminLink");
+  admin.hidden = !access.isAdmin;
+  if (access.status === "admin") {
+    title.textContent = "Администратор";
+    meta.textContent = "Полный доступ ко всем разделам";
+    note.textContent = "";
+  } else if (access.status === "blocked") {
+    title.textContent = "Доступ закрыт";
+    meta.textContent = "Аккаунт заблокирован";
+    note.textContent = "Обратитесь к администратору сервиса.";
+  } else if (access.status === "trial") {
+    title.textContent = "Пробный период";
+    meta.textContent = "Осталось " + access.daysLeft + " дн." + (access.expiresAt ? " · до " + fmtPlanDate(access.expiresAt) : "");
+    note.textContent = "Доступны все функции, включая онлайн-запись.";
+  } else if (access.status === "standard") {
+    title.textContent = "Тариф «Стандарт»";
+    meta.textContent = access.expiresAt ? "Действует до " + fmtPlanDate(access.expiresAt) : "Срок не задан";
+    note.textContent = "Онлайн-запись доступна только в тарифе «Премиум».";
+  } else if (access.status === "premium") {
+    title.textContent = "Тариф «Премиум»";
+    meta.textContent = access.expiresAt ? "Действует до " + fmtPlanDate(access.expiresAt) : "Срок не задан";
+    note.textContent = "Доступны все функции, включая онлайн-запись.";
+  } else {
+    title.textContent = "Тариф не активен";
+    meta.textContent = access.expiresAt ? "Закончился " + fmtPlanDate(access.expiresAt) : "Нужен активный тариф";
+    note.textContent = "Доступен только Кабинет. Подключите тариф, чтобы открыть остальные разделы.";
+  }
+}
 const panel = Kit.contactsPanel($("me"), prof, hello);
 $("me").querySelector("h2").textContent = "Мои данные";
 // из раздела нажали на незаполненный контакт (#ig, #max, #email…): ставим курсор в его поле, а если вписано, но выключено — на галку
@@ -170,6 +215,7 @@ if (want === "email" || want === "hideBusy") panel.focus(want);
 else if (prof.soc[want]) panel.focus(prof.soc[want].val.trim() || want === "wa" ? want + "-on" : "soc-" + want);
 Kit.saveProfile(prof, true);                                   // данные по умолчанию сразу видны и в разделах
 hello();
+renderPlan();
 window.addEventListener("kit:sync", event => {
   const el = document.getElementById("syncStatus");
   if (!el) return;
@@ -197,6 +243,12 @@ $("schedSave").addEventListener("click", () => {
 const publishBtn = $("publishBtn"), publishStatus = $("publishStatus"), publishLink = $("publishLink"), bookingCard = $("bookingCard");
 function showPublished() {
   if (!prof.bookingUrl) return;
+  if (!access || !access.features.booking) {
+    publishLink.hidden = true;
+    if (bookingCard) bookingCard.removeAttribute("href");
+    publishStatus.textContent = access && access.status === "standard" ? "Страница записи временно закрыта: онлайн-запись доступна в тарифе «Премиум»." : "Страница записи временно закрыта: нужен активный тариф.";
+    return;
+  }
   publishStatus.textContent = "Опубликовано. Клиенты смогут записаться по ссылке.";
   publishLink.href = prof.bookingUrl; publishLink.hidden = false;
   if (bookingCard) bookingCard.href = prof.bookingUrl;
@@ -205,6 +257,12 @@ function showPublished() {
 showPublished();
 publishBtn.addEventListener("click", async () => {
   if (!signedIn) { publishStatus.textContent = "Сначала войдите в аккаунт."; return; }
+  if (!access || !access.features.booking) {
+    publishStatus.textContent = access && access.status === "standard"
+      ? "Онлайн-запись доступна только в тарифе «Премиум». Подключите его, чтобы принимать заявки."
+      : "Для онлайн-записи нужен активный тариф. Откройте условия в кабинете.";
+    return;
+  }
   let priceState = Kit.loadJSON("price.v1") || {};
   try {
     const priceResponse = await fetch(API_URL + "/api/price", { credentials: "include" });
@@ -251,7 +309,7 @@ publishBtn.addEventListener("click", async () => {
   finally { publishBtn.disabled = false; }
 });
 async function loadRequests() {
-  if (!signedIn) return;
+  if (!signedIn || !access || !access.features.core) return;
   try {
     const response = await fetch(API_URL + "/api/booking/requests", { credentials: "include" });
     if (!response.ok) return;
@@ -276,6 +334,6 @@ if (params.get("yandex") === "ok") {
 }
 })();
 </script>
-<script src="../kit/pwa.js?v=202611151400"></script>
+<script src="../kit/pwa.js?v=202611151500"></script>
 </body>
 </html>

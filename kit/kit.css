@@ -275,3 +275,16 @@ header.top { background: transparent; -webkit-backdrop-filter: none; backdrop-fi
 #pwaInstall { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 80; border: 1px solid var(--accent); border-radius: 99px; background: var(--accent); color: var(--accent-ink); font: inherit; font-size: 13px; font-weight: 600; padding: 11px 18px; box-shadow: 0 10px 30px rgba(0,0,0,.18); cursor: pointer; }
 #pwaInstall:hover { filter: brightness(1.05); }
 @media (max-width: 520px) { #pwaInstall { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); font-size: 12.5px; padding: 10px 15px; } }
+
+/* доступ по тарифу */
+.access-gate { background: var(--panel); border: 1px solid var(--accent); border-radius: 16px; padding: 26px 24px; display: flex; flex-direction: column; gap: 10px; color: var(--text); }
+.access-gate h2 { margin: 0; font-family: var(--display); font-size: 34px; font-weight: 500; color: var(--accent); }
+.access-gate p { margin: 0; color: var(--muted); line-height: 1.55; max-width: 620px; }
+.access-gate .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+body.access-locked .wrap > :not(header.top):not(.access-gate) { display: none !important; }
+.access-toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 90; max-width: min(92vw, 520px); padding: 11px 16px; border: 1px solid var(--accent); border-radius: 12px; background: var(--panel); color: var(--text); font-size: 13px; line-height: 1.45; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+.plan { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.plan-meta { display: block; color: var(--text); font-size: 15px; line-height: 1.45; }
+.plan-note { margin-top: 8px; }
+.plan-admin { display: inline-block; margin-top: 10px; color: var(--accent); font-size: 13px; font-weight: 600; text-decoration: none; }
+.plan-admin:hover { text-decoration: underline; }
