@@ -163,3 +163,13 @@ ALTER TABLE booking_requests DROP CONSTRAINT IF EXISTS booking_requests_source_c
 ALTER TABLE booking_requests ADD CONSTRAINT booking_requests_source_check CHECK (source IN ('online', 'manual'));
 
 ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS duration integer NOT NULL DEFAULT 60;
+
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'master';
+ALTER TABLE masters DROP CONSTRAINT IF EXISTS masters_role_check;
+ALTER TABLE masters ADD CONSTRAINT masters_role_check CHECK (role IN ('master', 'admin'));
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS plan text NOT NULL DEFAULT 'trial';
+ALTER TABLE masters DROP CONSTRAINT IF EXISTS masters_plan_check;
+ALTER TABLE masters ADD CONSTRAINT masters_plan_check CHECK (plan IN ('trial', 'standard', 'premium'));
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS trial_until timestamptz NOT NULL DEFAULT (now() + interval '7 days');
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS plan_until timestamptz;
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS blocked boolean NOT NULL DEFAULT false;

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f8f2ec">
+<title>Админ-панель — Мастерфолио</title>
+<link rel="stylesheet" href="../kit/kit.css?v=202611151500">
+<style>
+  .admin-app[hidden], .admin-gate[hidden] { display: none; }
+  .admin-gate { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px; line-height: 1.55; }
+  .admin-gate a { color: var(--accent); }
+  .admin-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .admin-toolbar input { flex: 1 1 240px; min-width: 0; font: inherit; font-size: 15px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); color: var(--text); }
+  .admin-toolbar button, .admin-row button { border: 1px solid var(--line); border-radius: 99px; background: var(--panel); color: var(--text); font: inherit; font-size: 13px; padding: 8px 13px; cursor: pointer; }
+  .admin-toolbar button:hover, .admin-row button:hover { border-color: var(--accent); color: var(--accent); }
+  .admin-row button:disabled { opacity: .45; cursor: default; }
+  .admin-count { color: var(--muted); font-size: 13px; }
+  .admin-status { min-height: 20px; color: var(--muted); font-size: 13px; margin: 10px 0; }
+  .admin-list { display: flex; flex-direction: column; gap: 10px; }
+  .admin-row { display: grid; grid-template-columns: minmax(190px, 1.1fr) minmax(180px, .9fr) minmax(330px, 1.3fr); gap: 14px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+  .admin-row .who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .admin-row .who b { font-size: 16px; color: var(--accent); }
+  .admin-row .who span, .admin-row .who small, .admin-state span { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+  .admin-state { display: flex; flex-direction: column; gap: 4px; }
+  .admin-state .badge { align-self: flex-start; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 4px 8px; border-radius: 99px; border: 1px solid currentColor; }
+  .badge.trial, .badge.premium, .badge.admin { color: var(--accent); }
+  .badge.standard { color: #4f7f45; }
+  .badge.expired, .badge.blocked { color: var(--bad); }
+  .admin-controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .admin-controls select, .admin-controls input { font: inherit; font-size: 13px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--text); max-width: 100%; }
+  .admin-controls input[type="date"] { width: 135px; }
+  @media (max-width: 900px) { .admin-row { grid-template-columns: 1fr; gap: 10px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Админ-панель</h1>
+    <nav><a href="../cabinet/">Кабинет</a><a href="../">Главная</a></nav>
+  </header>
+
+  <div class="admin-gate" id="gate" hidden></div>
+
+  <section class="admin-app" id="app" hidden>
+    <div class="admin-toolbar">
+      <input id="search" type="search" placeholder="Имя, почта или телефон" autocomplete="off">
+      <button type="button" id="searchBtn">Найти</button>
+      <span class="admin-count" id="count"></span>
+    </div>
+    <div class="admin-status" id="status"></div>
+    <div class="admin-list" id="list"></div>
+  </section>
+</div>
+<script>
+const API = "https://api.masterfolio.ru";
+const $ = id => document.getElementById(id);
+let me = null;
+let rows = [];
+const esc = value => String(value == null ? "" : value).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function showGate(text) {
+  $("gate").innerHTML = text;
+  $("gate").hidden = false;
+  $("app").hidden = true;
+}
+function fmtDate(value) {
+  if (!value) return "—";
+  try { return new Intl.DateTimeFormat("ru-RU").format(new Date(value)); } catch (error) { return "—"; }
+}
+function dateValue(value) {
+  return value ? String(value).slice(0, 10) : "";
+}
+function render() {
+  $("count").textContent = rows.length ? "Найдено: " + rows.length : "Ничего не найдено";
+  $("list").innerHTML = rows.map(m => {
+    const access = m.access || {};
+    const own = me && m.id === me.id;
+    const until = dateValue(m.plan_until || m.trial_until);
+    const selected = m.plan || "trial";
+    return `<article class="admin-row" data-id="${esc(m.id)}">
+      <div class="who">
+        <b>${esc(m.name)}</b>
+        <span>${esc(m.email || "")}</span>
+        <span>${esc(m.phone || "")}</span>
+        <small>с ${fmtDate(m.created_at)}</small>
+      </div>
+      <div class="admin-state">
+        <span class="badge ${esc(access.status || "expired")}">${esc(access.label || access.status || "—")}</span>
+        <span>${access.daysLeft ? "Осталось " + access.daysLeft + " дн." : ""}${access.expiresAt ? " · до " + fmtDate(access.expiresAt) : ""}</span>
+        <span>${m.booking_published ? "Запись опубликована" : "Запись не опубликована"}</span>
+      </div>
+      <div class="admin-controls">
+        <select class="plan" aria-label="Тариф">
+          <option value="trial"${selected === "trial" ? " selected" : ""}>Пробный</option>
+          <option value="standard"${selected === "standard" ? " selected" : ""}>Стандарт</option>
+          <option value="premium"${selected === "premium" ? " selected" : ""}>Премиум</option>
+        </select>
+        <input class="until" type="date" value="${until}" aria-label="Дата окончания">
+        <button type="button" data-act="save">Применить</button>
+        <button type="button" data-act="trial">Сбросить триал</button>
+        <button type="button" data-act="block"${own ? " disabled" : ""}>${m.blocked ? "Разблокировать" : "Заблокировать"}</button>
+      </div>
+    </article>`;
+  }).join("");
+}
+async function load(query) {
+  $("status").textContent = "Загружаю…";
+  const response = await fetch(API + "/api/admin/masters?limit=100" + (query ? "&q=" + encodeURIComponent(query) : ""), { credentials: "include" });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) { $("status").textContent = data.error || "Не удалось загрузить список."; return; }
+  rows = data.masters || [];
+  $("status").textContent = "";
+  render();
+}
+async function saveRow(row, payload) {
+  const id = row.dataset.id;
+  $("status").textContent = "Сохраняю…";
+  const response = await fetch(API + "/api/admin/master", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, ...payload })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) { $("status").textContent = data.error || "Не удалось сохранить."; return; }
+  $("status").textContent = "Сохранено.";
+  await load($("search").value.trim());
+}
+$("searchBtn").addEventListener("click", () => load($("search").value.trim()));
+$("search").addEventListener("keydown", event => { if (event.key === "Enter") load($("search").value.trim()); });
+$("list").addEventListener("click", event => {
+  const button = event.target.closest("button[data-act]");
+  if (!button) return;
+  const row = button.closest(".admin-row");
+  if (!row) return;
+  const act = button.dataset.act;
+  if (act === "save") {
+    const plan = row.querySelector(".plan").value;
+    if (plan === "trial") saveRow(row, { action: "trial" });
+    else saveRow(row, { action: "plan", plan, until: row.querySelector(".until").value });
+  } else if (act === "trial") {
+    if (confirm("Начать новый пробный период на 7 дней?")) saveRow(row, { action: "trial" });
+  } else if (act === "block") {
+    const blocked = !row.querySelector("[data-act=block]").textContent.includes("Разблокировать");
+    if (confirm(blocked ? "Заблокировать мастера?" : "Разблокировать мастера?")) saveRow(row, { action: "block", blocked });
+  }
+});
+(async function init() {
+  try {
+    const response = await fetch(API + "/api/auth/me", { credentials: "include" });
+    if (!response.ok) { showGate('Войдите в аккаунт администратора. <a href="../auth/">Перейти ко входу</a>'); return; }
+    const data = await response.json();
+    me = data.master;
+    if (!data.access || data.access.isAdmin !== true) { showGate('Доступ только для администратора. <a href="../cabinet/">Вернуться в кабинет</a>'); return; }
+    $("app").hidden = false;
+    await load("");
+  } catch (error) {
+    showGate("Не удалось связаться с сервером. Проверьте интернет и обновите страницу.");
+  }
+})();
+</script>
+</body>
+</html>

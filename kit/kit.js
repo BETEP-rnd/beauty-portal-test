@@ -871,6 +871,99 @@
 
   const ACCOUNT_KEY = "beauty.accountId";
   const PROFILE_OWNER_KEY = "beauty.profileOwner";
+  let currentAccess = null, accessPromise = null, accessNavBound = false, accessToastTimer = 0;
+
+  function accessDate(value) {
+    if (!value) return "";
+    try { return new Intl.DateTimeFormat("ru-RU").format(new Date(value)); } catch (error) { return ""; }
+  }
+  function accessPath() {
+    return location.pathname.replace(/\/+$/, "/");
+  }
+  function accessCorePage() {
+    const path = accessPath();
+    return ["/schedule/", "/price/", "/windows/", "/certs/", "/clients/"].some(part => path.indexOf(part) >= 0);
+  }
+  function accessNotice() {
+    let el = document.getElementById("accessToast");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "accessToast";
+      el.className = "access-toast";
+      document.body.appendChild(el);
+    }
+    el.textContent = currentAccess && currentAccess.blocked
+      ? "Аккаунт заблокирован. Обратитесь к администратору сервиса."
+      : "Для этого раздела нужен активный тариф. Откройте Кабинет.";
+    el.hidden = false;
+    clearTimeout(accessToastTimer);
+    accessToastTimer = setTimeout(() => { el.hidden = true; }, 4500);
+  }
+  function bindAccessNav() {
+    if (accessNavBound) return;
+    accessNavBound = true;
+    document.addEventListener("click", event => {
+      if (!currentAccess || currentAccess.features.core) return;
+      const link = event.target.closest("header.top nav a");
+      if (!link) return;
+      const href = link.getAttribute("href") || "";
+      if (href.indexOf("cabinet") >= 0 || href.indexOf("auth") >= 0 || href === "../" || href === "/") return;
+      event.preventDefault();
+      accessNotice();
+    }, true);
+  }
+  function applyAccessGate() {
+    bindAccessNav();
+    const wrap = document.querySelector(".wrap");
+    if (!wrap) return;
+    let gate = wrap.querySelector(".access-gate");
+    const locked = Boolean(currentAccess && currentAccess.features && currentAccess.features.core === false && accessCorePage());
+    if (!locked) {
+      document.body.classList.remove("access-locked");
+      if (gate) gate.remove();
+      return;
+    }
+    document.body.classList.add("access-locked");
+    if (!gate) {
+      gate = document.createElement("section");
+      gate.className = "access-gate";
+      const header = wrap.querySelector("header.top");
+      if (header) header.insertAdjacentElement("afterend", gate);
+      else wrap.prepend(gate);
+    }
+    const blocked = currentAccess.blocked;
+    const date = accessDate(currentAccess.expiresAt);
+    gate.innerHTML = blocked
+      ? '<h2>Доступ закрыт</h2><p>Аккаунт заблокирован. Обратитесь к администратору сервиса.</p><div class="actions"><a class="btn" href="../cabinet/">Личный кабинет</a></div>'
+      : '<h2>Нужен тариф</h2><p>Пробный период или тариф закончился' + (date ? ' ' + Kit.esc(date) : '') + '. Прайс-лист, свободные окошки, сертификаты, график и клиенты откроются после подключения тарифа.</p><div class="actions"><a class="btn" href="../cabinet/">Перейти в кабинет</a><button class="btn ghost" type="button" data-access-refresh>Проверить доступ</button></div>';
+    const refresh = gate.querySelector("[data-access-refresh]");
+    if (refresh) refresh.addEventListener("click", () => loadAccess(true));
+  }
+  async function loadAccess(force) {
+    if (!force && accessPromise) return accessPromise;
+    accessPromise = fetch(API_URL + "/api/auth/me", { credentials: "include" })
+      .then(async response => {
+        if (!response.ok) {
+          currentAccess = null;
+          Kit.access = null;
+          applyAccessGate();
+          return null;
+        }
+        const data = await response.json();
+        currentAccess = data.access || null;
+        Kit.access = currentAccess;
+        try { window.dispatchEvent(new CustomEvent("kit:access", { detail: currentAccess })); } catch (error) {}
+        applyAccessGate();
+        return data;
+      })
+      .catch(() => {
+        currentAccess = null;
+        Kit.access = null;
+        applyAccessGate();
+        return null;
+      });
+    return accessPromise;
+  }
   function updateAccountNav(loggedIn) {
     try {
       document.querySelectorAll("header.top nav").forEach(nav => {
@@ -894,6 +987,17 @@
         } else if (exit) {
           exit.remove();
         }
+        const admin = nav.querySelector("[data-admin-link]");
+        if (loggedIn && currentAccess && currentAccess.isAdmin) {
+          if (!admin) {
+            const link = document.createElement("a");
+            link.dataset.adminLink = "1";
+            link.href = "../admin/";
+            link.textContent = "Админка";
+            link.style.cssText = "color:var(--accent);font-weight:600;";
+            nav.appendChild(link);
+          } else admin.hidden = false;
+        } else if (admin) admin.remove();
       });
     } catch (error) {}
   }
@@ -908,8 +1012,7 @@
   }
   function syncAccountProfile() {
     try {
-      fetch(API_URL + "/api/auth/me", { credentials: "include" })
-        .then(response => response.ok ? response.json() : null)
+      loadAccess()
         .then(data => {
           const master = data && data.master;
           let accountId = null;
@@ -961,6 +1064,11 @@
   setTimeout(revealActiveNav, 60);
   window.addEventListener("load", revealActiveNav);
   syncAccountProfile();
+  Kit.accessReady = () => loadAccess();
+  Kit.refreshAccess = () => loadAccess(true);
+  Kit.hasFeature = feature => Boolean(currentAccess && currentAccess.features && currentAccess.features[feature]);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) loadAccess(true); });
+  setInterval(() => { if (!document.hidden) loadAccess(true); }, 300000);
 
   uiTheme();
   Object.assign(Kit, {

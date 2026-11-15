@@ -134,19 +134,19 @@ async function currentMaster(req) {
   const token = parseCookies(req)["__Host-mf_session"];
   if (!token) return null;
   const result = await pool.query(
-    "SELECT m.id, m.name, m.email, m.phone, m.price FROM sessions s JOIN masters m ON m.id = s.master_id WHERE s.token_hash = $1 AND s.expires_at > now()",
+    "SELECT m.id, m.name, m.email, m.phone, m.price, m.role, m.plan, m.trial_until, m.plan_until, m.blocked FROM sessions s JOIN masters m ON m.id = s.master_id WHERE s.token_hash = $1 AND s.expires_at > now()",
     [tokenHash(token)]
   );
   return result.rows[0] || null;
 }
 
 async function priceGet(req, res) {
-  const master = await requireMaster(req);
+  const master = await requireCore(req);
   json(res, 200, { price: master.price || null });
 }
 
 async function priceSave(req, res) {
-  const master = await requireMaster(req);
+  const master = await requireCore(req);
   const data = await body(req);
   const price = data.price;
   if (!price || typeof price !== "object" || !Array.isArray(price.services)) {
@@ -186,7 +186,7 @@ async function profileSave(req, res) {
   json(res, 200, { profile: profile === undefined ? null : profile, settings: settings === undefined ? null : settings });
 }
 
-function rateLimit(req, route) {
+function rateLimit(req, route, max = 12) {
   const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
   const ip = forwarded || req.socket.remoteAddress || "unknown";
   const key = `${route}:${ip}`;
@@ -199,7 +199,7 @@ function rateLimit(req, route) {
   if (attempts.size > 10000) {
     for (const [key, value] of attempts) if (now - value.started > windowMs) attempts.delete(key);
   }
-  if (entry.count > 12) throw new HttpError(429, "Слишком много попыток. Повторите через 15 минут.");
+  if (entry.count > max) throw new HttpError(429, "Слишком много попыток. Повторите через 15 минут.");
 }
 
 async function register(req, res) {
@@ -429,8 +429,166 @@ async function yandexCallback(req, res) {
 async function requireMaster(req) {
   const master = await currentMaster(req);
   if (!master) throw new HttpError(401, "Войдите в аккаунт.");
+  if (master.blocked) throw new HttpError(403, "Аккаунт заблокирован. Обратитесь к администратору сервиса.");
   return master;
 }
+
+function planAccess(master) {
+  const now = Date.now();
+  const blocked = Boolean(master && master.blocked);
+  const isAdmin = Boolean(master && master.role === "admin");
+  const plan = master && master.plan ? master.plan : "trial";
+  const trialTime = master && master.trial_until ? new Date(master.trial_until).getTime() : 0;
+  const paidTime = master && master.plan_until ? new Date(master.plan_until).getTime() : 0;
+  const trialActive = !blocked && !isAdmin && plan === "trial" && trialTime > now;
+  const paidActive = !blocked && !isAdmin && (plan === "standard" || plan === "premium") && paidTime > now;
+  let status = "expired";
+  if (blocked) status = "blocked";
+  else if (isAdmin) status = "admin";
+  else if (trialActive) status = "trial";
+  else if (paidActive) status = plan;
+  const active = status === "admin" || status === "trial" || status === "standard" || status === "premium";
+  const expiresAt = status === "trial" ? master.trial_until : (status === "standard" || status === "premium") ? master.plan_until : null;
+  const daysLeft = expiresAt ? Math.max(0, Math.ceil((new Date(expiresAt).getTime() - now) / 86400000)) : 0;
+  const labels = { admin: "Администратор", trial: "Пробный", standard: "Стандарт", premium: "Премиум", expired: "Тариф не активен", blocked: "Заблокирован" };
+  return {
+    role: master && master.role ? master.role : "master",
+    isAdmin,
+    blocked,
+    plan,
+    status,
+    label: labels[status] || labels.expired,
+    active,
+    expiresAt,
+    trialUntil: master && master.trial_until ? master.trial_until : null,
+    planUntil: master && master.plan_until ? master.plan_until : null,
+    daysLeft,
+    features: {
+      core: !blocked && active,
+      booking: !blocked && (isAdmin || status === "trial" || status === "premium")
+    }
+  };
+}
+
+function assertFeature(master, feature) {
+  const access = planAccess(master);
+  if (access.blocked) throw new HttpError(403, "Аккаунт заблокирован. Обратитесь к администратору сервиса.");
+  if (!access.features[feature]) {
+    if (feature === "booking" && access.active) throw new HttpError(403, "Онлайн-запись доступна только на тарифе «Премиум».");
+    throw new HttpError(403, "Тариф не активен. Подключите тариф в личном кабинете.");
+  }
+  return access;
+}
+
+async function requireCore(req) {
+  const master = await requireMaster(req);
+  assertFeature(master, "core");
+  return master;
+}
+
+async function requireBooking(req) {
+  const master = await requireMaster(req);
+  assertFeature(master, "booking");
+  return master;
+}
+
+async function requireAdmin(req) {
+  const master = await currentMaster(req);
+  if (!master) throw new HttpError(401, "Войдите в аккаунт.");
+  if (master.blocked) throw new HttpError(403, "Аккаунт заблокирован. Обратитесь к администратору сервиса.");
+  if (master.role !== "admin") throw new HttpError(403, "Доступ только для администратора.");
+  return master;
+}
+
+const ADMIN_MASTER_FIELDS = "m.id, m.name, m.email, m.phone, m.role, m.plan, m.trial_until, m.plan_until, m.blocked, m.created_at, b.slug AS booking_slug, (b.master_id IS NOT NULL) AS booking_published";
+
+function adminMasterView(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    phone: row.phone,
+    role: row.role,
+    plan: row.plan,
+    trial_until: row.trial_until,
+    plan_until: row.plan_until,
+    blocked: row.blocked,
+    created_at: row.created_at,
+    booking_slug: row.booking_slug,
+    booking_published: row.booking_published,
+    access: planAccess(row)
+  };
+}
+
+async function adminMasterRow(id) {
+  const result = await pool.query(
+    `SELECT ${ADMIN_MASTER_FIELDS} FROM masters m LEFT JOIN booking_profiles b ON b.master_id = m.id WHERE m.id = $1`,
+    [id]
+  );
+  return result.rows[0] ? adminMasterView(result.rows[0]) : null;
+}
+
+async function adminMasters(req, res) {
+  await requireAdmin(req);
+  const url = new URL(req.url, "http://localhost");
+  const query = String(url.searchParams.get("q") || "").trim().slice(0, 100);
+  const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit")) || 50));
+  const offset = Math.max(0, Number(url.searchParams.get("offset")) || 0);
+  const params = [];
+  let where = "";
+  if (query) {
+    params.push("%" + query.replace(/[\\%_]/g, "\\$&") + "%");
+    where = "WHERE (m.name ILIKE $1 OR m.email ILIKE $1 OR m.phone ILIKE $1)";
+  }
+  const limitPlaceholder = params.length + 1;
+  params.push(limit);
+  const offsetPlaceholder = params.length + 1;
+  params.push(offset);
+  const result = await pool.query(
+    `SELECT ${ADMIN_MASTER_FIELDS} FROM masters m LEFT JOIN booking_profiles b ON b.master_id = m.id ${where} ORDER BY m.created_at DESC LIMIT $${limitPlaceholder} OFFSET $${offsetPlaceholder}`,
+    params
+  );
+  json(res, 200, { masters: result.rows.map(adminMasterView), limit, offset });
+}
+
+function adminDate(value) {
+  const text = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null;
+  const date = new Date(text + "T23:59:59+03:00");
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+async function adminMasterSave(req, res) {
+  const admin = await requireAdmin(req);
+  const data = await body(req);
+  const id = String(data.id || "");
+  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new HttpError(400, "Некорректный идентификатор мастера.");
+  const current = await pool.query("SELECT id, role, blocked FROM masters WHERE id = $1", [id]);
+  const target = current.rows[0];
+  if (!target) throw new HttpError(404, "Мастер не найден.");
+  const action = String(data.action || "plan");
+
+  if (action === "plan") {
+    const plan = String(data.plan || "");
+    if (plan !== "standard" && plan !== "premium") throw new HttpError(400, "Выберите Стандарт или Премиум.");
+    const until = data.until ? adminDate(data.until) : new Date(Date.now() + 30 * 86400000);
+    if (!until) throw new HttpError(400, "Некорректная дата окончания тарифа.");
+    if (until.getTime() < Date.now() - 86400000) throw new HttpError(400, "Дата окончания уже прошла.");
+    await pool.query("UPDATE masters SET plan = $1, plan_until = $2 WHERE id = $3", [plan, until.toISOString(), id]);
+  } else if (action === "trial") {
+    await pool.query("UPDATE masters SET plan = 'trial', trial_until = now() + interval '7 days', plan_until = NULL WHERE id = $1", [id]);
+  } else if (action === "block") {
+    const blocked = data.blocked === true;
+    if (blocked && id === admin.id) throw new HttpError(400, "Нельзя заблокировать собственный аккаунт.");
+    await pool.query("UPDATE masters SET blocked = $1 WHERE id = $2", [blocked, id]);
+  } else {
+    throw new HttpError(400, "Неизвестное действие.");
+  }
+
+  json(res, 200, { master: await adminMasterRow(id) });
+}
+
+
 
 const isoDay = value => {
   if (!value) return "";
@@ -485,13 +643,13 @@ function certTerm(value) {
 }
 
 async function certList(req, res) {
-  const master = await requireMaster(req);
+  const master = await requireCore(req);
   const result = await pool.query("SELECT * FROM certificates WHERE master_id = $1 ORDER BY number DESC LIMIT 500", [master.id]);
   json(res, 200, { items: result.rows.map(certJson) });
 }
 
 async function certCreate(req, res) {
-  const master = await requireMaster(req);
+  const master = await requireCore(req);
   const data = await body(req);
   const who = certRecipient(data.who);
   const sum = certAmount(data.sum);
@@ -517,7 +675,7 @@ async function certCreate(req, res) {
 }
 
 async function certCheck(req, res) {
-  const master = await requireMaster(req);
+  const master = await requireCore(req);
   const data = await body(req);
   const number = certNumber(data.no);
   const result = await pool.query("SELECT * FROM certificates WHERE master_id = $1 AND number = $2", [master.id, number]);
@@ -526,7 +684,7 @@ async function certCheck(req, res) {
 }
 
 async function certUse(req, res) {
-  const master = await requireMaster(req);
+  const master = await requireCore(req);
   const data = await body(req);
   const number = certNumber(data.no);
   const client = await pool.connect();
@@ -862,7 +1020,7 @@ function validBookingSlug(value) {
 }
 
 async function bookingPublish(req, res) {
-  const master = await requireMaster(req);
+  const master = await requireBooking(req);
   const data = await body(req, PUBLISH_BODY_LIMIT);
   const profile = data.profile, price = data.price, windows = data.windows;
   if (!profile || typeof profile !== "object" || !price || typeof price !== "object" || !windows || typeof windows !== "object") {
@@ -883,8 +1041,10 @@ async function bookingPublish(req, res) {
 
 async function bookingPublic(req, res, slug) {
   if (!validBookingSlug(slug)) throw new HttpError(404, "Страница записи не найдена.");
-  const result = await pool.query("SELECT master_id, data, updated_at FROM booking_profiles WHERE slug = $1", [slug]);
+  const result = await pool.query("SELECT b.master_id, b.data, b.updated_at, m.role, m.plan, m.trial_until, m.plan_until, m.blocked FROM booking_profiles b JOIN masters m ON m.id = b.master_id WHERE b.slug = $1", [slug]);
   if (!result.rows.length) throw new HttpError(404, "Страница записи не найдена или снята с публикации.");
+  const targetAccess = planAccess(result.rows[0]);
+  if (!targetAccess.features.booking) throw new HttpError(403, "Онлайн-запись этого мастера временно недоступна.");
   const masterId = result.rows[0].master_id;
   await pool.query("UPDATE booking_requests SET status = 'expired' WHERE master_id = $1 AND status = 'pending' AND hold_until < now()", [masterId]);
   const busy = await pool.query(
@@ -914,9 +1074,11 @@ async function bookingRequest(req, res) {
   if (data.consent !== true) throw new HttpError(400, "Нужно согласие на обработку данных.");
   const comment = String(data.comment || "").trim().slice(0, 300);
   const duration = Math.max(15, Math.min(600, Number(data.duration) || 60));
-  const found = await pool.query("SELECT master_id, data FROM booking_profiles WHERE slug = $1", [slug]);
+  const found = await pool.query("SELECT b.master_id, b.data, m.role, m.plan, m.trial_until, m.plan_until, m.blocked FROM booking_profiles b JOIN masters m ON m.id = b.master_id WHERE b.slug = $1", [slug]);
   if (!found.rows.length) throw new HttpError(404, "Страница записи не найдена или снята с публикации.");
   const row = found.rows[0];
+  const targetAccess = planAccess(row);
+  if (!targetAccess.features.booking) throw new HttpError(403, "Онлайн-запись этого мастера временно недоступна.");
   const blocked = await pool.query("SELECT 1 FROM booking_blacklist WHERE master_id = $1 AND phone = $2", [row.master_id, phone]);
   if (blocked.rows.length) throw new HttpError(403, "Мастер не принимает заявки с этого номера.");
   await pool.query("UPDATE booking_requests SET status = 'expired' WHERE status = 'pending' AND hold_until < now()");
@@ -963,7 +1125,7 @@ async function bookingRequest(req, res) {
 }
 
 async function bookingRequests(req, res) {
-  const master = await requireMaster(req);
+  const master = await requireCore(req);
   await pool.query("UPDATE booking_requests SET status = 'expired' WHERE master_id = $1 AND status = 'pending' AND hold_until < now()", [master.id]);
   const result = await pool.query(
     "SELECT id, name, phone, services, to_char(day, 'YYYY-MM-DD') AS day, time, comment, status, source, duration, created_at FROM booking_requests WHERE master_id = $1 ORDER BY created_at DESC LIMIT 200",
@@ -973,7 +1135,7 @@ async function bookingRequests(req, res) {
 }
 
 async function bookingStatus(req, res) {
-  const master = await requireMaster(req);
+  const master = await requireCore(req);
   const data = await body(req);
   const id = String(data.id || "");
   const status = data.status === "confirmed" ? "confirmed" : data.status === "declined" ? "declined" : "";
@@ -995,7 +1157,7 @@ async function bookingStatus(req, res) {
 }
 
 async function bookingManual(req, res) {
-  const master = await requireMaster(req);
+  const master = await requireCore(req);
   const data = await body(req);
   const name = String(data.name || "").trim().replace(/\s+/g, " ");
   if (name.length < 2 || name.length > 60) throw new HttpError(400, "Укажите имя клиента.");
@@ -1023,7 +1185,7 @@ async function bookingManual(req, res) {
 }
 
 async function bookingDelete(req, res) {
-  const master = await requireMaster(req);
+  const master = await requireCore(req);
   const data = await body(req);
   const id = String(data.id || "");
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw new HttpError(400, "Некорректная запись.");
@@ -1038,12 +1200,12 @@ async function bookingBlacklistList(masterId) {
 }
 
 async function bookingBlacklistGet(req, res) {
-  const master = await requireMaster(req);
+  const master = await requireCore(req);
   json(res, 200, { phones: await bookingBlacklistList(master.id) });
 }
 
 async function bookingBlacklistSet(req, res) {
-  const master = await requireMaster(req);
+  const master = await requireCore(req);
   const data = await body(req);
   const phone = normalizePhone(data.phone);
   if (data.action === "remove") {
@@ -1099,13 +1261,13 @@ async function handle(req, res) {
   if (url.pathname === "/api/certs/create" && req.method === "POST") return await certCreate(req, res);
   if (url.pathname === "/api/certs/check" && req.method === "POST") return await certCheck(req, res);
   if (url.pathname === "/api/certs/use" && req.method === "POST") return await certUse(req, res);
-  if (url.pathname === "/api/certs/ping" && req.method === "GET") { await requireMaster(req); return json(res, 200, { ok: true }); }
+  if (url.pathname === "/api/certs/ping" && req.method === "GET") { await requireCore(req); return json(res, 200, { ok: true }); }
   if (url.pathname === "/api/telegram/webhook" && req.method === "POST") return await telegramWebhook(req, res);
   if (url.pathname === "/api/auth/logout" && req.method === "POST") return await logout(req, res);
   if (url.pathname === "/api/auth/me" && req.method === "GET") {
     const master = await currentMaster(req);
     if (!master) throw new HttpError(401, "Вход не выполнен.");
-    return json(res, 200, { master });
+    return json(res, 200, { master, access: planAccess(master) });
   }
   if (url.pathname === "/api/price" && req.method === "GET") return await priceGet(req, res);
   if (url.pathname === "/api/price" && req.method === "POST") { rateLimit(req, "price-save"); return await priceSave(req, res); }
@@ -1120,6 +1282,8 @@ async function handle(req, res) {
   if (url.pathname === "/api/booking/status" && req.method === "POST") { rateLimit(req, "booking-status"); return await bookingStatus(req, res); }
   if (url.pathname === "/api/booking/manual" && req.method === "POST") { rateLimit(req, "booking-manual"); return await bookingManual(req, res); }
   if (url.pathname === "/api/booking/delete" && req.method === "POST") { rateLimit(req, "booking-delete"); return await bookingDelete(req, res); }
+  if (url.pathname === "/api/admin/masters" && req.method === "GET") { rateLimit(req, "admin-masters", 60); return await adminMasters(req, res); }
+  if (url.pathname === "/api/admin/master" && req.method === "POST") { rateLimit(req, "admin-master", 30); return await adminMasterSave(req, res); }
   throw new HttpError(404, "Адрес не найден.");
 }
 
