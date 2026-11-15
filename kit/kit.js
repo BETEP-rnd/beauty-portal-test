@@ -23,17 +23,36 @@
     get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
     set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
   };
-  // оформление сайта: светлая / тёмная / комбинированная; без выбора — как в системе
+  // оформление сайта: одна кнопка переключает светлую, тёмную и комбинированную
   function uiTheme() {
-    const head = document.querySelector("header.top"); if (!head) return;
+    const nav = document.querySelector("header.top nav"); if (!nav) return;
+    const order = ["light", "dark", "mix"];
+    const names = { light: "Светлая", dark: "Тёмная", mix: "Комбинированная" };
+    const icons = {
+      light: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+      dark: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4a8.5 8.5 0 1 0 11.2 11.2Z"/></svg>',
+      mix: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18Z" fill="currentColor" stroke="none"/></svg>'
+    };
     const cur = () => store.get("beauty.ui") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-    const box = document.createElement("div");
-    box.className = "uiswitch"; box.setAttribute("role", "group"); box.setAttribute("aria-label", "Оформление");
-    box.innerHTML = '<button type="button" data-k="light">Светлая</button><button type="button" data-k="dark">Тёмная</button><button type="button" data-k="mix">Комбинированная</button>';
-    const apply = () => { document.documentElement.dataset.ui = cur(); box.querySelectorAll("[data-k]").forEach(b => b.setAttribute("aria-pressed", b.dataset.k === cur())); };
-    box.addEventListener("click", e => { const b = e.target.closest("[data-k]"); if (b) { store.set("beauty.ui", b.dataset.k); apply(); } });
-    head.append(box);
-    if (store.get("beauty.ui")) apply(); else box.querySelectorAll("[data-k]").forEach(b => b.setAttribute("aria-pressed", b.dataset.k === cur()));
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "theme-btn";
+    const apply = () => {
+      const value = cur();
+      document.documentElement.dataset.ui = value;
+      btn.innerHTML = icons[value] || icons.light;
+      const next = order[(order.indexOf(value) + 1) % order.length];
+      btn.title = "Тема: " + (names[value] || value) + ". Переключить на " + names[next];
+      btn.setAttribute("aria-label", btn.title);
+    };
+    btn.addEventListener("click", () => {
+      const value = cur();
+      const next = order[(order.indexOf(value) + 1) % order.length];
+      store.set("beauty.ui", next);
+      apply();
+    });
+    const exit = nav.querySelector("[data-account-exit]");
+    nav.insertBefore(btn, exit || null);
+    apply();
   }
   const loadJSON = k => { try { return JSON.parse(store.get(k)); } catch (e) { return null; } };
   const FAV_KEY = "beauty.favs";                                // избранные фоны (id тем)
