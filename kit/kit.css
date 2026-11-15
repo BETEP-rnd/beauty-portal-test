@@ -249,23 +249,23 @@ a.chip.off:hover { color: var(--accent); border-color: var(--accent); }
 .flash { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 10px; }
 /* стабильная шапка: не прыгает при переходах */
 html { overflow-y: scroll; scrollbar-gutter: stable; }
-header.top { position: sticky; top: 0; z-index: 50; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "title title" "nav switch"; align-items: center; column-gap: 22px; row-gap: 12px; background: transparent; padding: 12px 0; }
+header.top { position: sticky; top: 0; z-index: 50; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "title" "nav"; align-items: center; row-gap: 12px; background: transparent; padding: 12px 0; }
 header.top h1 { grid-area: title; width: auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 header.top nav { grid-area: nav; }
-.uiswitch { grid-area: switch; justify-self: end; margin-left: 0; }
+.theme-btn { flex: 0 0 auto; width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border: 1px solid var(--page-line, var(--line)); border-radius: 10px; background: var(--page-bg, var(--bg)); color: var(--page-muted, var(--muted)); cursor: pointer; }
+.theme-btn:hover { color: var(--accent); border-color: var(--accent); }
+.theme-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
-/* телефон: шапка в три ряда — название, прокручиваемое меню, переключатель темы на всю ширину */
+/* телефон: шапка в два ряда, меню прокручивается горизонтально */
 @media (max-width: 700px) {
-  header.top { grid-template-columns: minmax(0, 1fr); grid-template-areas: "title" "nav" "switch"; column-gap: 0; row-gap: 10px; }
+  header.top { grid-template-columns: minmax(0, 1fr); grid-template-areas: "title" "nav"; column-gap: 0; row-gap: 10px; }
   header.top nav { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch; }
   header.top nav::-webkit-scrollbar { display: none; }
   header.top nav a { flex: 0 0 auto; white-space: nowrap; }
-  .uiswitch { justify-self: stretch; width: 100%; margin-left: 0; }
-  .uiswitch button { flex: 1 1 0; min-width: 0; padding: 8px 4px; font-size: 12px; }
 }
 @media (max-width: 380px) {
   header.top nav a { padding: 5px 9px; font-size: 12px; }
-  .uiswitch button { font-size: 11px; }
+  .theme-btn { width: 30px; height: 30px; }
 }
 
 /* прозрачная шапка: виден фон страницы */
