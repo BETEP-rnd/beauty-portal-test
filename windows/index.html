@@ -5,7 +5,7 @@
 <script>
 (function () {
   try {
-    var build = "202611151700";
+    var build = "202611151800";
     if (localStorage.getItem("beauty.build") === build) return;
     localStorage.setItem("beauty.build", build);
     var jobs = [];
@@ -37,7 +37,7 @@
 <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
 <title>Свободные окошки</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Raleway:ital,wght@0,400;0,600;0,700;1,400&family=Manrope:wght@400;600;700&family=Nunito:ital,wght@0,400;0,700;1,400&family=Comfortaa:wght@400;700&family=Oswald:wght@400;600&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Lora:ital,wght@0,400;0,700;1,400&family=Prata&family=Forum&family=Poiret+One&family=Marck+Script&family=Bad+Script&family=Caveat:wght@400;700&family=Lobster&family=Amatic+SC:wght@400;700&display=swap">
-<link rel="stylesheet" href="../kit/kit.css?v=202611151700">
+<link rel="stylesheet" href="../kit/kit.css?v=202611151800">
 <script>try { var u = localStorage.getItem("beauty.ui"); if (u) document.documentElement.dataset.ui = u; } catch (e) {}</script>
 </head>
 <body>
@@ -129,7 +129,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="../kit/backgrounds.js?v=202611110807"></script>
 <script src="../kit/trends.js?v=202611110807"></script>
-<script src="../kit/kit.js?v=202611151700"></script>
+<script src="../kit/kit.js?v=202611151800"></script>
 <script>
 const TEXTS = [
   { k: "title", name: "Заголовок" }, { k: "subtitle", name: "Подзаголовок" }, { k: "master", name: "Имя мастера" },
@@ -187,11 +187,20 @@ function count() {                                              // «m2» — д
 }
 const dates = () => Array.from({ length: count() }, (_, i) => addDays(S.start, i));
 const isLong = () => count() > LONG;
-const range = () => { const a = toMin(S.dayStart), b = toMin(S.dayEnd); return b > a ? [a, b] : [a, a]; };
-const cells = () => { const [a, b] = range(), out = []; for (let m = a; m + S.step <= b; m += S.step) out.push(m); return out; };
+function range(iso) {
+  const state = Kit.loadJSON("schedule.v1") || {};
+  const custom = (state.days || {})[iso];
+  if (custom && custom.off) return null;
+  const a = toMin((custom && custom.start) || state.start || S.dayStart);
+  const b = toMin((custom && custom.end) || state.end || S.dayEnd);
+  return b > a ? [a, b] : [a, a];
+}
+const cells = iso => { const r = range(iso); if (!r) return []; const [a, b] = r, out = []; for (let m = a; m + S.step <= b; m += S.step) out.push(m); return out; };
 // свободное время дня хранится интервалами [начало, конец] в минутах — не зависит от шага и рабочего дня
 function intervals(iso) {
-  const [a, b] = range();
+  const r = range(iso);
+  if (!r) return [];
+  const [a, b] = r;
   let list = (S.free[iso] || []).map(([s, e]) => [Math.max(s, a), Math.min(e, b)]).filter(([s, e]) => e > s);
   (busy[iso] || []).forEach(([bs, be]) => {
     list = list.flatMap(([s, e]) => {
@@ -207,7 +216,7 @@ function intervals(iso) {
 const cellOn = (iso, m) => intervals(iso).some(([s, e]) => s <= m && m + S.step <= e);
 function setCells(iso, onSet) {                                 // клетки дня → интервалы
   const list = [];
-  cells().forEach(m => { if (onSet.has(m)) { const last = list[list.length - 1]; if (last && last[1] === m) last[1] = m + S.step; else list.push([m, m + S.step]); } });
+  cells(iso).forEach(m => { if (onSet.has(m)) { const last = list[list.length - 1]; if (last && last[1] === m) last[1] = m + S.step; else list.push([m, m + S.step]); } });
   if (list.length) S.free[iso] = list; else delete S.free[iso];
 }
 const dayLabel = iso => { const d = fromIso(iso); return `${DOW[d.getDay()]}, ${d.getDate()} ${MON_SHORT[d.getMonth()]}`; };
@@ -452,6 +461,7 @@ function hints() {
 
 // ---------- сетка свободного времени, по месяцам ----------
 function summary(iso) {
+  if (!range(iso)) return { text: "выходной", warn: false };
   const iv = intervals(iso);
   if (!iv.length) return { text: "занято", warn: false };
   const short = S.minLen ? iv.filter(([a, b]) => b - a < S.minLen) : [];
@@ -465,13 +475,14 @@ function summary(iso) {
 const openMonths = new Set();                                   // какие месяцы развёрнуты (первый — всегда при старте)
 function monthStat(mk) { const ds = dates().filter(d => d.startsWith(mk)); return `${ds.filter(d => intervals(d).length).length} из ${ds.length} дн. с окошками`; }
 function buildDays() {
-  const cs = cells(), ds = dates();
-  if (!cs.length) { $("days").innerHTML = `<div class="empty">Проверьте рабочий день: время «до» должно быть позже «с».</div>`; return; }
+  const ds = dates();
+  if (!ds.some(iso => cells(iso).length)) { $("days").innerHTML = `<div class="empty">В выбранном периоде нет рабочих дней.</div>`; return; }
   if (!openMonths.size) openMonths.add(ds[0].slice(0, 7));
   const every = S.step === 15 ? 4 : S.step === 30 ? 2 : 1;      // подпись каждого часа
-  const hours = `<div class="hours">${cs.map((m, i) => `<span>${i % every === 0 && m % 60 === 0 ? m / 60 : ""}</span>`).join("")}</div>`;
   const last = ds[ds.length - 1];
   const dayHtml = iso => {
+    const cs = cells(iso);
+    const hours = `<div class="hours">${cs.map((m, i) => `<span>${i % every === 0 && m % 60 === 0 ? m / 60 : ""}</span>`).join("")}</div>`;
     const sm = summary(iso), dt = fromIso(iso), weekend = dt.getDay() === 0 || dt.getDay() === 6;
     return `<div class="day" data-iso="${iso}">
       <div class="dayhead"><b${weekend ? ' class="we"' : ""}>${dayLabel(iso)}</b><span class="sum${sm.warn ? " warn" : ""}">${sm.text}</span>
@@ -521,18 +532,20 @@ $("days").addEventListener("keydown", e => {                    // с клави
 });
 $("days").addEventListener("click", e => {
   const b = e.target.closest("button[data-act]"); if (!b) return;
-  const iso = b.closest(".day").dataset.iso, [a, z] = range(), last = dates().slice(-1)[0];
+  const iso = b.closest(".day").dataset.iso, r = range(iso), last = dates().slice(-1)[0];
+  const [a, z] = r || [0, 0];
   const copyTo = to => { if (S.free[iso]) S.free[to] = S.free[iso].map(x => [...x]); else delete S.free[to]; };
-  if (b.dataset.act === "all") S.free[iso] = [[a, z]];
+  if (b.dataset.act === "all" && r) S.free[iso] = [[a, z]];
   if (b.dataset.act === "clear") delete S.free[iso];
   if (b.dataset.act === "copy") copyTo(addDays(iso, 1));
   if (b.dataset.act === "weekly") for (let d = addDays(iso, 7); d <= last; d = addDays(d, 7)) copyTo(d);
   const scroll = window.scrollY; buildDays(); window.scrollTo(0, scroll); changed();
 });
 function fillBySchedule() {
-  const [a, z] = range();
-  if (z <= a) return;
   dates().forEach(iso => {
+    const r = range(iso);
+    if (!r) { delete S.free[iso]; return; }
+    const [a, z] = r;
     let list = [[a, z]];
     (busy[iso] || []).forEach(([bs, be]) => {
       list = list.flatMap(([s, e]) => {
@@ -608,6 +621,6 @@ buildDays(); tabs.show(tabs.current); changed(); loadBusy();
 Promise.all([...fonts.fontsInUse(), '600 84px "Cormorant Garamond"', '128px "Marck Script"', '600 30px "Montserrat"'].map(f => document.fonts.load(f, "Свободные окошки 0123456789")))
   .catch(() => {}).then(() => { changed(); if (tabs.current === "design") design.show(); });
 </script>
-<script src="../kit/pwa.js?v=202611151700"></script>
+<script src="../kit/pwa.js?v=202611151800"></script>
 </body>
 </html>

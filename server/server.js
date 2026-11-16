@@ -1019,6 +1019,25 @@ function validBookingSlug(value) {
   return /^[a-f0-9]{12}$/.test(String(value || ""));
 }
 
+function timeMinutes(value) {
+  const match = String(value || "").match(/^(\d{2}):(\d{2})$/);
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+}
+
+async function hasBookingConflict(masterId, day, time, duration, excludeId = "") {
+  const params = [masterId, day, time, duration];
+  let exclude = "";
+  if (excludeId) {
+    params.push(excludeId);
+    exclude = "AND id <> $5";
+  }
+  const result = await pool.query(
+    `SELECT 1 FROM booking_requests WHERE master_id = $1 AND day = $2::date AND status IN ('pending', 'confirmed') AND (status = 'confirmed' OR hold_until > now()) ${exclude} AND (day + time::time) < ($2::date + $3::time + $4::int * interval '1 minute') AND (day + time::time + duration * interval '1 minute') > ($2::date + $3::time) LIMIT 1`,
+    params
+  );
+  return result.rows.length > 0;
+}
+
 async function bookingPublish(req, res) {
   const master = await requireBooking(req);
   const data = await body(req, PUBLISH_BODY_LIMIT);
@@ -1088,17 +1107,21 @@ async function bookingRequest(req, res) {
   if (recent.rows[0].n >= 2) throw new HttpError(429, "Слишком много заявок с этого номера. Попробуйте завтра.");
   const client = await pool.query("SELECT chat_id FROM telegram_clients WHERE phone = $1", [phone]);
   const clientChatId = client.rows[0]?.chat_id || null;
-  const free = row.data && row.data.windows && row.data.windows.free;
+  const windows = row.data && row.data.windows || {};
+  const customDay = (windows.days || {})[day];
+  if (customDay && customDay.off) throw new HttpError(409, "В этот день мастер не принимает записи. Выберите другую дату.");
+  const free = windows.free;
   const intervals = free && free[day];
   const minutes = hour * 60 + minute;
+  const dayStart = timeMinutes((customDay && customDay.start) || windows.dayStart);
+  const dayEnd = timeMinutes((customDay && customDay.end) || windows.dayEnd);
+  if (dayStart !== null && (minutes < dayStart || (dayEnd !== null && minutes + duration > dayEnd))) {
+    throw new HttpError(409, "Это время вне рабочего дня мастера. Выберите другое.");
+  }
   if (!Array.isArray(intervals) || !intervals.some(pair => Array.isArray(pair) && pair.length === 2 && Number.isFinite(pair[0]) && Number.isFinite(pair[1]) && minutes >= pair[0] && minutes + duration <= pair[1])) {
     throw new HttpError(409, "Это время уже недоступно. Обновите страницу и выберите другое.");
   }
-  const conflict = await pool.query(
-    "SELECT 1 FROM booking_requests WHERE master_id = $1 AND day = $2::date AND status IN ('pending', 'confirmed') AND (status = 'confirmed' OR hold_until > now()) AND (day + time::time) < ($2::date + $3::time + $4::int * interval '1 minute') AND (day + time::time + duration * interval '1 minute') > ($2::date + $3::time) LIMIT 1",
-    [row.master_id, day, time, duration]
-  );
-  if (conflict.rows.length) throw new HttpError(409, "Это время уже занято. Выберите другое.");
+  if (await hasBookingConflict(row.master_id, day, time, duration)) throw new HttpError(409, "Это время уже занято. Выберите другое.");
   const insert = await pool.query(
     "INSERT INTO booking_requests (master_id, name, phone, services, day, time, comment, client_chat_id, duration) VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9) RETURNING id",
     [row.master_id, name, phone, JSON.stringify(services), day, time, comment, clientChatId, duration]
@@ -1170,6 +1193,7 @@ async function bookingManual(req, res) {
   if (!/^\d{2}:\d{2}$/.test(time)) throw new HttpError(400, "Выберите время.");
   const comment = String(data.comment || "").trim().slice(0, 300);
   const duration = Math.max(15, Math.min(600, Number(data.duration) || 90));
+  if (await hasBookingConflict(master.id, day, time, duration)) throw new HttpError(409, "Это время уже занято. Выберите другое.");
   const client = await pool.query("SELECT chat_id FROM telegram_clients WHERE phone = $1", [phone]);
   const clientChatId = client.rows[0]?.chat_id || null;
   const result = await pool.query(
@@ -1192,6 +1216,32 @@ async function bookingDelete(req, res) {
   const result = await pool.query("DELETE FROM booking_requests WHERE id = $1 AND master_id = $2 RETURNING id", [id, master.id]);
   if (!result.rows.length) throw new HttpError(404, "Запись не найдена.");
   json(res, 200, { ok: true });
+}
+
+async function bookingUpdate(req, res) {
+  const master = await requireCore(req);
+  const data = await body(req);
+  const id = String(data.id || "");
+  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new HttpError(400, "Некорректная запись.");
+  const name = String(data.name || "").trim().replace(/\s+/g, " ");
+  if (name.length < 2 || name.length > 60) throw new HttpError(400, "Укажите имя клиента.");
+  const phone = normalizePhone(data.phone);
+  const services = Array.isArray(data.services) ? data.services.map(s => String(s || "").trim()).filter(Boolean).slice(0, 5) : [];
+  if (!services.length) throw new HttpError(400, "Укажите услугу.");
+  const day = String(data.day || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new HttpError(400, "Выберите дату.");
+  const time = String(data.time || "");
+  if (!/^\d{2}:\d{2}$/.test(time)) throw new HttpError(400, "Выберите время.");
+  const comment = String(data.comment || "").trim().slice(0, 300);
+  const duration = Math.max(15, Math.min(600, Number(data.duration) || 90));
+  const exists = await pool.query("SELECT 1 FROM booking_requests WHERE id = $1 AND master_id = $2", [id, master.id]);
+  if (!exists.rows.length) throw new HttpError(404, "Запись не найдена.");
+  if (await hasBookingConflict(master.id, day, time, duration, id)) throw new HttpError(409, "Это время пересекается с другой записью.");
+  await pool.query(
+    "UPDATE booking_requests SET name = $1, phone = $2, services = $3::jsonb, day = $4, time = $5, comment = $6, duration = $7 WHERE id = $8 AND master_id = $9",
+    [name, phone, JSON.stringify(services), day, time, comment, duration, id, master.id]
+  );
+  json(res, 200, { ok: true, id });
 }
 
 async function bookingBlacklistList(masterId) {
@@ -1282,6 +1332,7 @@ async function handle(req, res) {
   if (url.pathname === "/api/booking/status" && req.method === "POST") { rateLimit(req, "booking-status"); return await bookingStatus(req, res); }
   if (url.pathname === "/api/booking/manual" && req.method === "POST") { rateLimit(req, "booking-manual"); return await bookingManual(req, res); }
   if (url.pathname === "/api/booking/delete" && req.method === "POST") { rateLimit(req, "booking-delete"); return await bookingDelete(req, res); }
+  if (url.pathname === "/api/booking/update" && req.method === "POST") { rateLimit(req, "booking-update"); return await bookingUpdate(req, res); }
   if (url.pathname === "/api/admin/masters" && req.method === "GET") { rateLimit(req, "admin-masters", 60); return await adminMasters(req, res); }
   if (url.pathname === "/api/admin/master" && req.method === "POST") { rateLimit(req, "admin-master", 30); return await adminMasterSave(req, res); }
   throw new HttpError(404, "Адрес не найден.");
