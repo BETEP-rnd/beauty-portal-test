@@ -5,7 +5,7 @@
 <script>
 (function () {
   try {
-    var build = "202611151700";
+    var build = "202611151800";
     if (localStorage.getItem("beauty.build") === build) return;
     localStorage.setItem("beauty.build", build);
     var jobs = [];
@@ -37,7 +37,7 @@
 <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
 <title>График работы — Мастерфолио</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500&family=Manrope:wght@400;500;600;700&family=Montserrat:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="../kit/kit.css?v=202611151700">
+<link rel="stylesheet" href="../kit/kit.css?v=202611151800">
 <script>try { var u = localStorage.getItem("beauty.ui"); if (u) document.documentElement.dataset.ui = u; } catch (e) {}</script>
 <style>
   .sched { display: flex; flex-direction: column; gap: 14px; }
@@ -79,6 +79,11 @@
   .filters button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
   .timeline-panel { padding: 0; overflow: hidden; }
   .timeline-head { display: grid; grid-template-columns: 64px minmax(0, 1fr); border-bottom: 1px solid var(--line); background: var(--panel); }
+  .day-hours { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 0 0 12px; border-bottom: 1px solid var(--line); }
+  .day-hours .lbl { color: var(--muted); font-size: 12px; }
+  .day-hours input { width: 92px; font: inherit; font-size: 13px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--text); }
+  .day-hours .btn { padding: 7px 10px; font-size: 12px; }
+  .day-hours input:disabled { opacity: .45; }
   .timeline-head span, .timeline-head b { padding: 9px 12px; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
   .timeline-head b { color: var(--accent); }
   .timeline-scroll { overflow-x: auto; }
@@ -226,6 +231,16 @@
     <div class="status" id="status" role="status"></div>
 
     <section class="panel timeline-panel" id="dayView">
+      <div class="day-hours" id="dayHours">
+        <span class="lbl">Рабочий день</span>
+        <input id="dayStartInput" type="time" step="900">
+        <span class="lbl">—</span>
+        <input id="dayEndInput" type="time" step="900">
+        <button class="btn ghost" type="button" id="daySave">Сохранить</button>
+        <button class="btn ghost" type="button" id="dayCopy">Скопировать с прошлого дня</button>
+        <button class="btn ghost" type="button" id="dayOff">Выходной</button>
+      </div>
+      <div class="hint" id="dayHoursHint"></div>
       <div class="timeline-head"><span>Время</span><b id="masterName">Мастер</b></div>
       <div class="timeline-scroll">
         <div class="timeline">
@@ -256,7 +271,7 @@
 <div class="modal-overlay" id="manualOverlay" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-label="Новая запись">
     <button class="modal-close" type="button" id="closeManual" aria-label="Закрыть">×</button>
-    <h2>Новая запись</h2>
+    <h2 id="manualTitle">Новая запись</h2>
     <form class="manual" id="manual">
       <div class="field wide"><label for="mClient">Клиент из базы</label><select id="mClient"><option value="">Новый клиент</option></select></div>
       <div class="field"><label for="mName" class="req">Имя</label><input id="mName" type="text" maxlength="60" autocomplete="name" placeholder="Например, Анна Смирнова" required></div>
@@ -273,7 +288,7 @@
 
 <script src="../kit/backgrounds.js?v=202611110807"></script>
 <script src="../kit/trends.js?v=202611110807"></script>
-<script src="../kit/kit.js?v=202611151700"></script>
+<script src="../kit/kit.js?v=202611151800"></script>
 <script>
 const API_URL = "https://api.masterfolio.ru";
 const $ = id => document.getElementById(id);
@@ -288,12 +303,29 @@ const weekStart = day => { const d = new Date(day + "T00:00:00"); d.setDate(d.ge
 const timeToMin = value => { const [h, m] = String(value || "0:0").split(":").map(Number); return (h || 0) * 60 + (m || 0); };
 const minToTime = value => `${pad(Math.floor(value / 60))}:${pad(value % 60)}`;
 const durationOf = r => Math.max(15, Math.min(600, Number(r.duration) || 60));
+function scheduleState() { return Kit.loadJSON("schedule.v1") || {}; }
+function dayRange(iso) {
+  const state = scheduleState(), custom = (state.days || {})[iso];
+  if (custom && custom.off) return null;
+  const start = custom && custom.start || state.start || "08:00";
+  const end = custom && custom.end || state.end || "22:00";
+  return timeToMin(end) > timeToMin(start) ? { start, end } : { start: "08:00", end: "22:00" };
+}
+function saveDayRange(iso, start, end, off) {
+  const state = scheduleState();
+  state.days = state.days || {};
+  if (off) state.days[iso] = { off: true };
+  else state.days[iso] = { start, end };
+  Kit.store.set("schedule.v1", JSON.stringify(state));
+  renderAll();
+  setNote(off ? "День отмечен выходным." : `Рабочий день: ${start}–${end}.`, "ok");
+}
 const MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
 const DOW = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
 const DOW_SHORT = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 const HOUR_H = 72;
 const DEMO = new URLSearchParams(location.search).has("demo");
-let requests = [], selectedDate = today, view = "day", filter = "all", signedIn = false;
+let requests = [], selectedDate = today, view = "day", filter = "all", signedIn = false, editingId = "";
 let freeWindows = {}, baseStart = 8 * 60, baseEnd = 22 * 60, viewStart = 8 * 60, viewEnd = 22 * 60;
 let masterName = "Мастер";
 let manualServices = [];
@@ -389,10 +421,12 @@ function layoutAppointments(list) {
 
 function renderDay() {
   const list = requests.filter(r => r.day === selectedDate && matchFilter(r));
-  const wins = freeWindows[selectedDate] || [];
+  const day = dayRange(selectedDate);
+  const wins = day ? (freeWindows[selectedDate] || []) : [];
   const starts = list.map(r => timeToMin(r.time));
   const ends = list.map(r => timeToMin(r.time) + durationOf(r));
-  let gs = baseStart, ge = baseEnd;
+  let gs = day ? timeToMin(day.start) : baseStart;
+  let ge = day ? timeToMin(day.end) : baseEnd;
   if (starts.length) { gs = Math.min(gs, ...starts); ge = Math.max(ge, ...ends); }
   gs = Math.floor(gs / 60) * 60;
   ge = Math.ceil(ge / 60) * 60;
@@ -427,6 +461,13 @@ function renderDay() {
   const showNow = selectedDate === today && nowMin >= gs && nowMin <= ge;
   $("nowLine").hidden = !showNow;
   if (showNow) $("nowLine").style.top = `${(nowMin - gs) / 60 * HOUR_H}px`;
+  const dr = dayRange(selectedDate);
+  $("dayStartInput").value = dr ? dr.start : "";
+  $("dayEndInput").value = dr ? dr.end : "";
+  $("dayStartInput").disabled = !dr;
+  $("dayEndInput").disabled = !dr;
+  $("dayOff").textContent = dr ? "Выходной" : "Сделать рабочим";
+  $("dayHoursHint").textContent = dr ? "" : "Выходной день";
 }
 
 function listCard(r) {
@@ -537,7 +578,7 @@ function openDetail(id) {
   const source = r.source === "manual" ? "manual" : "online";
   const services = Array.isArray(r.services) ? r.services.join(", ") : String(r.services || "");
   const end = minToTime(timeToMin(r.time) + durationOf(r));
-  const actions = `<div class="detail-actions">${status === "pending" ? `<button class="btn" type="button" data-ok="${esc(r.id)}">Подтвердить</button><button class="btn ghost" type="button" data-no="${esc(r.id)}">Отклонить</button>` : ""}<button class="btn ghost danger" type="button" data-del="${esc(r.id)}">Удалить</button></div>`;
+  const actions = `<div class="detail-actions"><button class="btn ghost" type="button" data-edit="${esc(r.id)}">Редактировать</button>${status === "pending" ? `<button class="btn" type="button" data-ok="${esc(r.id)}">Подтвердить</button><button class="btn ghost" type="button" data-no="${esc(r.id)}">Отклонить</button>` : ""}<button class="btn ghost danger" type="button" data-del="${esc(r.id)}">Удалить</button></div>`;
   $("detail").innerHTML = `<div class="detail-head"><span class="badge ${source}">${source === "manual" ? "Вручную" : "Онлайн-запись"}</span><span class="badge ${status}">${statusLabel(status)}</span></div>
     <h2>${esc(r.name)}</h2>
     ${r.phone ? `<a href="tel:${esc(r.phone)}" style="color:var(--accent);text-decoration:none;font-size:14px">${esc(fmtPhone(r.phone) || r.phone)}</a>` : ""}
@@ -552,6 +593,9 @@ function openDetail(id) {
 function closeDetail() { $("detailOverlay").hidden = true; }
 
 function openManual(day, time) {
+  editingId = "";
+  $("manualTitle").textContent = "Новая запись";
+  $("mSave").textContent = "Добавить";
   $("mClient").value = "";
   $("mName").value = "";
   $("mPhone").value = "";
@@ -566,7 +610,33 @@ function openManual(day, time) {
   setTimeout(() => $("mName").focus(), 50);
 }
 
-function closeManual() { $("manualOverlay").hidden = true; }
+function closeManual() {
+  $("manualOverlay").hidden = true;
+  editingId = "";
+  $("manualTitle").textContent = "Новая запись";
+  $("mSave").textContent = "Добавить";
+}
+
+function editRequest(id) {
+  const r = requests.find(item => item.id === id);
+  if (!r) return;
+  editingId = r.id;
+  manualServices = Array.isArray(r.services) ? r.services.slice() : [];
+  renderManualServices();
+  $("mClient").value = "";
+  $("mName").value = r.name || "";
+  $("mPhone").value = fmtPhone(r.phone) || r.phone || "";
+  $("mDate").value = r.day;
+  $("mTime").value = r.time;
+  $("mDuration").value = String(durationOf(r));
+  $("mNote").value = r.comment || "";
+  $("mSvcInput").value = "";
+  $("manualTitle").textContent = "Редактировать запись";
+  $("mSave").textContent = "Сохранить";
+  closeDetail();
+  $("manualOverlay").hidden = false;
+  setTimeout(() => $("mName").focus(), 50);
+}
 
 function renderManualServices() {
   $("mSvcChips").innerHTML = manualServices.map((name, i) => `<span class="svc-chip">${esc(name)}<button type="button" data-svc="${i}" aria-label="Убрать услугу ${esc(name)}">×</button></span>`).join("");
@@ -638,6 +708,21 @@ function setup() {
   $("prevDay").addEventListener("click", () => { selectedDate = addDays(selectedDate, -1); renderAll(); });
   $("nextDay").addEventListener("click", () => { selectedDate = addDays(selectedDate, 1); renderAll(); });
   $("todayBtn").addEventListener("click", () => { selectedDate = today; renderAll(); });
+  $("daySave").addEventListener("click", () => {
+    const start = $("dayStartInput").value, end = $("dayEndInput").value;
+    if (!start || !end || start >= end) { setNote("Начало рабочего дня должно быть раньше конца.", "err"); return; }
+    saveDayRange(selectedDate, start, end, false);
+  });
+  $("dayCopy").addEventListener("click", () => {
+    const previous = dayRange(addDays(selectedDate, -1));
+    if (previous) saveDayRange(selectedDate, previous.start, previous.end, false);
+    else saveDayRange(selectedDate, null, null, true);
+  });
+  $("dayOff").addEventListener("click", () => {
+    const current = dayRange(selectedDate), state = scheduleState();
+    if (current) saveDayRange(selectedDate, null, null, true);
+    else saveDayRange(selectedDate, state.start || "08:00", state.end || "22:00", false);
+  });
   $("views").addEventListener("click", e => {
     const button = e.target.closest("[data-v]");
     if (!button) return;
@@ -671,10 +756,11 @@ function setup() {
     openDetail(button.dataset.id);
   });
   $("detail").addEventListener("click", e => {
-    const ok = e.target.closest("[data-ok]"), no = e.target.closest("[data-no]"), del = e.target.closest("[data-del]");
+    const ok = e.target.closest("[data-ok]"), no = e.target.closest("[data-no]"), del = e.target.closest("[data-del]"), edit = e.target.closest("[data-edit]");
     if (ok) changeStatus(ok.dataset.ok, "confirmed");
     if (no) changeStatus(no.dataset.no, "declined");
     if (del) deleteRequest(del.dataset.del);
+    if (edit) editRequest(edit.dataset.edit);
   });
   $("masterCol").addEventListener("click", e => {
     if (e.target.closest(".appt-block")) return;
@@ -699,30 +785,36 @@ function setup() {
     const duration = Number($("mDuration").value) || 90;
     if (!day || !time) { setNote("Укажите дату и время.", "err"); return; }
     const comment = $("mNote").value.trim();
+    const wasEditing = Boolean(editingId);
     if (DEMO) {
-      requests.push({ id: "demo-" + Date.now(), name, phone, services, day, time, duration, comment, status: "confirmed", source: "manual" });
+      if (wasEditing) {
+        const row = requests.find(item => item.id === editingId);
+        if (row) Object.assign(row, { name, phone, services, day, time, duration, comment });
+      } else {
+        requests.push({ id: "demo-" + Date.now(), name, phone, services, day, time, duration, comment, status: "confirmed", source: "manual" });
+      }
       selectedDate = day; view = "day";
       $("views").querySelectorAll("[data-v]").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === "day" ? "true" : "false"));
-      closeManual(); renderAll(); setNote("Запись добавлена.", "ok");
+      closeManual(); renderAll(); setNote(wasEditing ? "Запись изменена." : "Запись добавлена.", "ok");
       return;
     }
     const button = $("mSave");
     button.disabled = true;
-    setNote("Добавляем…");
+    setNote(wasEditing ? "Сохраняем…" : "Добавляем…");
     try {
-      const response = await fetch(API_URL + "/api/booking/manual", {
+      const response = await fetch(API_URL + (wasEditing ? "/api/booking/update" : "/api/booking/manual"), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone, services, day, time, duration, comment })
+        body: JSON.stringify({ ...(wasEditing ? { id: editingId } : {}), name, phone, services, day, time, duration, comment })
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || "Не удалось добавить запись.");
+      if (!response.ok) throw new Error(result.error || (wasEditing ? "Не удалось изменить запись." : "Не удалось добавить запись."));
       selectedDate = day; view = "day";
       $("views").querySelectorAll("[data-v]").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === "day" ? "true" : "false"));
       closeManual();
       await load();
-      setNote("Запись добавлена.", "ok");
+      setNote(wasEditing ? "Запись изменена." : "Запись добавлена.", "ok");
     } catch (error) { setNote(error.message, "err"); }
     finally { button.disabled = false; }
   });
@@ -749,6 +841,6 @@ async function init() {
 
 init().catch(error => { const box = $("status"); if (box) { box.textContent = "Ошибка: " + ((error && error.message) || error); box.className = "status err"; } });
 </script>
-<script src="../kit/pwa.js?v=202611151700"></script>
+<script src="../kit/pwa.js?v=202611151800"></script>
 </body>
 </html>
