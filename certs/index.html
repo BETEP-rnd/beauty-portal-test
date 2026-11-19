@@ -5,7 +5,7 @@
 <script>
 (function () {
   try {
-    var build = "202611201600";
+    var build = "202611201700";
     if (localStorage.getItem("beauty.build") === build) return;
     localStorage.setItem("beauty.build", build);
     var jobs = [];
@@ -37,7 +37,7 @@
 <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
 <title>Подарочные сертификаты</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Raleway:ital,wght@0,400;0,600;0,700;1,400&family=Manrope:wght@400;600;700&family=Nunito:ital,wght@0,400;0,700;1,400&family=Comfortaa:wght@400;700&family=Oswald:wght@400;600&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Lora:ital,wght@0,400;0,700;1,400&family=Prata&family=Forum&family=Poiret+One&family=Marck+Script&family=Bad+Script&family=Caveat:wght@400;700&family=Lobster&family=Amatic+SC:wght@400;700&display=swap">
-<link rel="stylesheet" href="../kit/kit.css?v=202611201600">
+<link rel="stylesheet" href="../kit/kit.css?v=202611201700">
 <script>try { var u = localStorage.getItem("beauty.ui"); if (u) document.documentElement.dataset.ui = u; } catch (e) {}</script>
 <style>
   /* Проверка и журнал: карточка сертификата, статусы, список. */
@@ -152,8 +152,15 @@
       <!-- Дизайн -->
       <div class="tab" data-tab="design" hidden>
         <section class="group">
-          <h2>Рисунок</h2>
-          <label class="check"><input type="checkbox" id="eye"> Рисунок ресниц сверху</label>
+          <h2>Декор</h2>
+          <div class="field"><label for="decor">Рисунок сверху</label>
+            <select id="decor">
+              <option value="none">Без рисунка</option>
+              <option value="lashes">Ресницы</option>
+              <option value="branch">Веточка</option>
+              <option value="geometry">Геометрия</option>
+            </select>
+          </div>
         </section>
         <div id="design"></div>
       </div>
@@ -172,7 +179,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="../kit/backgrounds.js?v=202611110807"></script>
 <script src="../kit/trends.js?v=202611110807"></script>
-<script src="../kit/kit.js?v=202611201600"></script>
+<script src="../kit/kit.js?v=202611201700"></script>
 <script>
 // Сертификаты хранятся на сервере в PostgreSQL; у каждого мастера своя нумерация и журнал.
 const API_URL = "https://api.masterfolio.ru";
@@ -204,10 +211,12 @@ const money = n => (n >= 10000 ? Number(n).toLocaleString("ru-RU") : String(n)) 
 
 // ---------- состояние оформления ----------
 const KEY = "certs.v1";
-let S = { theme: "lux-0", format: "cert", top: "Gift Certificate", title: "Подарочный сертификат", purpose: "на наращивание ресниц",
-  role: "мастер по наращиванию ресниц", eye: true, text: {}, contacts: null };
+let S = { theme: "lux-0", format: "cert", top: "Gift Certificate", title: "Подарочный сертификат", purpose: "на услугу",
+  role: "мастер красоты", decor: "branch", text: {}, contacts: null };
 const saved = Kit.loadJSON(KEY);
 if (saved) Object.keys(S).forEach(k => { if (saved[k] != null) S[k] = saved[k]; });
+if (saved && saved.decor == null && typeof saved.eye === "boolean") S.decor = saved.eye ? "lashes" : "none";
+if (!["none", "lashes", "branch", "geometry"].includes(S.decor)) S.decor = "branch";
 if (!Kit.THEMES[S.theme]) S.theme = "lux-0";
 Kit.claimTheme("certs", S);                                     // один фон — один раздел
 S.format = "cert";
@@ -249,6 +258,41 @@ function eye(cx, top, width, t) {                               // закрыт�
   ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x0, y); ctx.quadraticCurveTo(200, cy, x1, y); ctx.stroke();
   ctx.restore();
 }
+function branch(cx, top, width, t) {
+  const k = width / 420;
+  ctx.save(); ctx.translate(cx - width / 2, top); ctx.scale(k, k); ctx.translate(20, 40);
+  ctx.strokeStyle = paintOn(ctx, t.accent, 0, 400); ctx.fillStyle = ctx.strokeStyle;
+  ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.lineWidth = 3; ctx.globalAlpha = .8;
+  ctx.beginPath(); ctx.moveTo(10, 220); ctx.bezierCurveTo(110, 190, 230, 140, 390, 26); ctx.stroke();
+  for (let i = 0; i < 9; i++) {
+    const u = i / 9, x = 20 + u * 350, y = 210 - u * 180 + Math.sin(u * Math.PI) * 20, side = i % 2 ? 1 : -1, len = 58 - u * 18;
+    ctx.beginPath(); ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(x + side * len * .35, y - len * .55, x + side * len, y - len * .8);
+    ctx.quadraticCurveTo(x + side * len * .45, y - len * .15, x, y);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = .55;
+  for (let i = 0; i < 5; i++) {
+    const u = .15 + i * .16, x = 20 + u * 350, y = 210 - u * 180 + Math.sin(u * Math.PI) * 20;
+    ctx.beginPath(); ctx.arc(x + 18, y - 18, 3.5, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+function geometry(cx, top, width, t) {
+  const k = width / 420;
+  ctx.save(); ctx.translate(cx - width / 2, top); ctx.scale(k, k); ctx.translate(10, 20);
+  ctx.strokeStyle = paintOn(ctx, t.accent, 0, 400); ctx.fillStyle = ctx.strokeStyle;
+  ctx.lineCap = "round"; ctx.lineWidth = 2.4; ctx.globalAlpha = .75;
+  ctx.beginPath(); ctx.arc(210, 120, 92, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(210, 120, 62, Math.PI * .15, Math.PI * 1.35); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(100, 120); ctx.lineTo(320, 120); ctx.stroke();
+  ctx.globalAlpha = .9; ctx.beginPath(); ctx.arc(210, 120, 8, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = .5;
+  [[118, 28], [302, 28], [118, 212], [302, 212]].forEach(([x, y]) => {
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.restore();
+}
 function draw() {
   ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0); ctx.globalAlpha = 1; ctx.textBaseline = "alphabetic";
   paint(th());
@@ -262,7 +306,9 @@ function preview(c, t) {
 function paint(t) {
   const d = issued || formData(), cw = W - 2 * 110, z = .9;   // z — масштаб от прежнего макета 1200 px
   Kit.drawBg(ctx, t, W, H);
-  if (S.eye) eye(W / 2, 112 * z, 300 * z, t);
+  if (S.decor === "lashes") eye(W / 2, 112 * z, 300 * z, t);
+  else if (S.decor === "branch") branch(W / 2, 112 * z, 300 * z, t);
+  else if (S.decor === "geometry") geometry(W / 2, 112 * z, 300 * z, t);
   const s = k => style(k), px = (k, n) => n * z * s(k).size;
   if (S.top.trim()) dr.centered(caseOf(s("top"), S.top.trim()), W / 2, 462 * z, fontOf(s("top"), px("top", 150)), s("top").color, cw);
   dr.spaced(caseOf(s("title"), S.title.trim() || "Подарочный сертификат"), W / 2, 600 * z, fontOf(s("title"), px("title", 50)), s("title").caps ? 9 * z : 0, s("title").color, cw);
@@ -468,7 +514,7 @@ const fonts = Kit.fontsPanel($("fonts"), TEXTS, S, style, changed);
 [["t-top", "top"], ["t-title", "title"], ["t-purpose", "purpose"], ["t-role", "role"]].forEach(([id, k]) => {
   $(id).value = S[k]; $(id).addEventListener("input", e => { S[k] = e.target.value; changed(); });
 });
-$("eye").checked = S.eye; $("eye").addEventListener("change", e => { S.eye = e.target.checked; changed(); });
+$("decor").value = S.decor; $("decor").addEventListener("change", e => { S.decor = e.target.value; changed(); });
 const tabs = Kit.tabs($("tabs"), "certs.tab", name => { if (name === "design") design.show(); });
 function showMode(m) {                                          // внутри «Содержания»: выпуск, проверка, журнал
   Kit.press($("mode"), m);
@@ -487,6 +533,6 @@ Promise.all([...fonts.fontsInUse(), '150px "Great Vibes"', '500 50px "Cormorant 
   .map(f => document.fonts.load(f, "Gift Certificate ПОДАРОЧНЫЙ СЕРТИФИКАТ 0123456789")))
   .catch(() => {}).then(() => { changed(); if (tabs.current === "design") design.show(); });
 </script>
-<script src="../kit/pwa.js?v=202611201600"></script>
+<script src="../kit/pwa.js?v=202611201700"></script>
 </body>
 </html>
