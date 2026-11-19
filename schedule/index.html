@@ -5,7 +5,7 @@
 <script>
 (function () {
   try {
-    var build = "202611151800";
+    var build = "202611201500";
     if (localStorage.getItem("beauty.build") === build) return;
     localStorage.setItem("beauty.build", build);
     var jobs = [];
@@ -37,7 +37,7 @@
 <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
 <title>График работы — Мастерфолио</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500&family=Manrope:wght@400;500;600;700&family=Montserrat:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="../kit/kit.css?v=202611151800">
+<link rel="stylesheet" href="../kit/kit.css?v=202611201500">
 <script>try { var u = localStorage.getItem("beauty.ui"); if (u) document.documentElement.dataset.ui = u; } catch (e) {}</script>
 <style>
   .sched { display: flex; flex-direction: column; gap: 14px; }
@@ -58,6 +58,9 @@
   .mday.today { border-color: var(--accent); }
   .mday.sel { background: var(--accent); color: var(--accent-ink); }
   .mday.sel i { color: inherit; }
+  .mday.off { border-style: dashed; background: color-mix(in srgb, var(--bad) 7%, var(--field)); color: var(--muted); }
+  .mday.off i.offmark { color: var(--bad); font-size: 8px; letter-spacing: .02em; }
+  .mday.sel.off i.offmark { color: inherit; }
   .daybar { padding: 14px 16px; gap: 12px; }
   .daynav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .daynav .title { margin-right: auto; font-family: var(--display); font-size: 24px; font-weight: 600; line-height: 1.05; }
@@ -79,11 +82,25 @@
   .filters button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
   .timeline-panel { padding: 0; overflow: hidden; }
   .timeline-head { display: grid; grid-template-columns: 64px minmax(0, 1fr); border-bottom: 1px solid var(--line); background: var(--panel); }
-  .day-hours { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 0 0 12px; border-bottom: 1px solid var(--line); }
+  .day-hours { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 0 0 12px 8px; border-bottom: 1px solid var(--line); }
+  #dayHoursHint { padding-left: 8px; }
   .day-hours .lbl { color: var(--muted); font-size: 12px; }
   .day-hours input { width: 92px; font: inherit; font-size: 13px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--text); }
   .day-hours .btn { padding: 7px 10px; font-size: 12px; }
   .day-hours input:disabled { opacity: .45; }
+  @media (max-width: 700px) {
+    .day-hours { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: 10px 12px; }
+    .day-hours > .lbl:first-child { grid-column: 1 / -1; }
+    .day-hours > .lbl:nth-of-type(2) { display: none; }
+    .day-hours input { width: 100%; }
+    .day-hours .btn { grid-column: 1 / -1; width: 100%; }
+    #dayHoursHint { padding-left: 12px; }
+    .sched { min-width: 0; }
+    .stats { gap: 6px; min-width: 0; }
+    .stat { padding: 8px 9px; min-width: 0; }
+    .stat span { font-size: 11px; overflow-wrap: anywhere; }
+    .stat b { font-size: 24px; }
+  }
   .timeline-head span, .timeline-head b { padding: 9px 12px; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
   .timeline-head b { color: var(--accent); }
   .timeline-scroll { overflow-x: auto; }
@@ -281,6 +298,8 @@
       <div class="field"><label for="mDuration" class="req">Длительность</label><select id="mDuration"><option value="30">30 минут</option><option value="60">1 час</option><option value="90" selected>1,5 часа</option><option value="120">2 часа</option><option value="150">2,5 часа</option><option value="180">3 часа</option><option value="240">4 часа</option></select></div>
       <div class="field wide"><label for="mSvcInput" class="req">Услуги</label><div class="svc-add"><input id="mSvcInput" type="text" list="mSvc" maxlength="80" placeholder="Начни вводить услугу"><button class="btn ghost" type="button" id="mSvcAdd" aria-label="Добавить услугу">+</button></div><div class="svc-chips" id="mSvcChips"></div><datalist id="mSvc"></datalist></div>
       <div class="field wide"><label for="mNote">Комментарий</label><textarea id="mNote" maxlength="300" placeholder="Пожелания, особенности, заметка"></textarea></div>
+      <div class="hint wide" id="manualAvail"></div>
+      <div class="status" id="manualStatus" role="status"></div>
       <div class="actions"><button class="btn" type="submit" id="mSave">Добавить</button><button class="btn ghost" type="button" id="mCancel">Отмена</button></div>
     </form>
   </div>
@@ -288,7 +307,7 @@
 
 <script src="../kit/backgrounds.js?v=202611110807"></script>
 <script src="../kit/trends.js?v=202611110807"></script>
-<script src="../kit/kit.js?v=202611151800"></script>
+<script src="../kit/kit.js?v=202611201500"></script>
 <script>
 const API_URL = "https://api.masterfolio.ru";
 const $ = id => document.getElementById(id);
@@ -350,6 +369,13 @@ function setNote(text, kind) {
   el.className = "status" + (kind ? " " + kind : "");
 }
 
+function setManualNote(text, kind) {
+  const el = $("manualStatus");
+  if (!el) return;
+  el.textContent = text || "";
+  el.className = "status" + (kind ? " " + kind : "");
+}
+
 function dateLabel(day) {
   const d = new Date(day + "T00:00:00");
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}, ${DOW[d.getDay()]}`;
@@ -393,6 +419,7 @@ function renderMonth() {
   const shift = (first.getDay() + 6) % 7;
   const days = new Date(year, month, 0).getDate();
   const counts = {};
+  const scheduleDays = (Kit.loadJSON("schedule.v1") || {}).days || {};
   requests.forEach(r => { if (r.status === "pending" || r.status === "confirmed") counts[r.day] = (counts[r.day] || 0) + 1; });
   const total = Object.keys(counts).filter(day => day.startsWith(monthCursor)).reduce((sum, day) => sum + counts[day], 0);
   const title = first.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
@@ -400,8 +427,9 @@ function renderMonth() {
   $("monthTotal").textContent = `${total} ${plural(total, "запись", "записи", "записей")}`;
   let html = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map(day => `<span class="wd">${day}</span>`).join("") + `<span></span>`.repeat(shift);
   for (let day = 1; day <= days; day++) {
-    const key = `${monthCursor}-${pad(day)}`, count = counts[key] || 0;
-    html += `<button type="button" class="mday${key === today ? " today" : ""}${key === selectedDate ? " sel" : ""}" data-day="${key}"><span>${day}</span>${count ? `<i>${count}</i>` : ""}</button>`;
+    const key = `${monthCursor}-${pad(day)}`, count = counts[key] || 0, off = Boolean(scheduleDays[key] && scheduleDays[key].off);
+    const marker = off ? '<i class="offmark">вых</i>' : count ? `<i>${count}</i>` : "";
+    html += `<button type="button" class="mday${key === today ? " today" : ""}${key === selectedDate ? " sel" : ""}${off ? " off" : ""}" data-day="${key}" title="${off ? "Выходной" : ""}"><span>${day}</span>${marker}</button>`;
   }
   $("monthGrid").innerHTML = html;
 }
@@ -606,6 +634,8 @@ function openManual(day, time) {
   $("mDate").value = day || selectedDate;
   $("mTime").value = time || "12:00";
   $("mDuration").value = "90";
+  setManualNote("");
+  updateManualAvailability();
   $("manualOverlay").hidden = false;
   setTimeout(() => $("mName").focus(), 50);
 }
@@ -615,6 +645,47 @@ function closeManual() {
   editingId = "";
   $("manualTitle").textContent = "Новая запись";
   $("mSave").textContent = "Добавить";
+  setManualNote("");
+}
+
+function updateManualAvailability() {
+  const day = $("mDate").value, time = $("mTime").value;
+  const duration = $("mDuration"), hint = $("manualAvail"), save = $("mSave");
+  if (!day || !time) {
+    [...duration.options].forEach(option => { option.disabled = false; });
+    hint.textContent = "";
+    save.disabled = false;
+    return;
+  }
+  const work = dayRange(day);
+  if (!work) {
+    [...duration.options].forEach(option => { option.disabled = true; });
+    hint.textContent = "Выходной день. Выберите другую дату.";
+    save.disabled = true;
+    return;
+  }
+  const start = timeToMin(time);
+  const workStart = timeToMin(work.start), workEnd = timeToMin(work.end);
+  let limit = workEnd;
+  let available = start >= workStart && start < workEnd ? workEnd - start : 0;
+  const busy = requests.filter(r => r.day === day && r.id !== editingId && (r.status === "pending" || r.status === "confirmed"));
+  const overlap = busy.find(r => {
+    const from = timeToMin(r.time);
+    return from <= start && start < from + durationOf(r);
+  });
+  if (overlap) {
+    available = 0;
+    limit = start;
+  } else {
+    const next = busy.map(r => timeToMin(r.time)).filter(from => from > start).sort((a, b) => a - b)[0];
+    if (next !== undefined) limit = Math.min(limit, next);
+    available = Math.max(0, Math.min(available, limit - start));
+  }
+  [...duration.options].forEach(option => { option.disabled = Number(option.value) > available; });
+  const allowed = [...duration.options].filter(option => !option.disabled).map(option => Number(option.value));
+  if (!allowed.includes(Number(duration.value))) duration.value = String(allowed[allowed.length - 1] || allowed[0] || 30);
+  hint.textContent = available > 0 ? `Свободно до ${minToTime(limit)} · максимум ${available} мин` : "На это время уже есть запись.";
+  save.disabled = available <= 0;
 }
 
 function editRequest(id) {
@@ -633,6 +704,8 @@ function editRequest(id) {
   $("mSvcInput").value = "";
   $("manualTitle").textContent = "Редактировать запись";
   $("mSave").textContent = "Сохранить";
+  setManualNote("");
+  updateManualAvailability();
   closeDetail();
   $("manualOverlay").hidden = false;
   setTimeout(() => $("mName").focus(), 50);
@@ -693,6 +766,7 @@ function setup() {
     if (remove) { manualServices.splice(Number(remove.dataset.svc), 1); renderManualServices(); }
   });
   $("mPhone").addEventListener("input", e => { e.target.value = maskPhone(e.target.value, (e.inputType || "").startsWith("delete")); });
+  ["mDate", "mTime"].forEach(id => $(id).addEventListener("change", updateManualAvailability));
 
   $("monthPrev").addEventListener("click", () => { monthCursor = moveMonth(monthCursor, -1); renderMonth(); });
   $("monthNext").addEventListener("click", () => { monthCursor = moveMonth(monthCursor, 1); renderMonth(); });
@@ -776,14 +850,14 @@ function setup() {
     e.preventDefault();
     const name = $("mName").value.trim();
     const phone = $("mPhone").value;
-    if (!name) { setNote("Укажите имя клиента.", "err"); return $("mName").focus(); }
-    if (!normPhone(phone)) { setNote("Укажите телефон полностью.", "err"); return $("mPhone").focus(); }
+    if (!name) { setManualNote("Укажите имя клиента.", "err"); return $("mName").focus(); }
+    if (!normPhone(phone)) { setManualNote("Укажите телефон полностью.", "err"); return $("mPhone").focus(); }
     if ($("mSvcInput").value.trim()) { addManualService($("mSvcInput").value); $("mSvcInput").value = ""; }
     const services = manualServices.slice();
-    if (!services.length) { setNote("Укажите хотя бы одну услугу.", "err"); return $("mSvcInput").focus(); }
+    if (!services.length) { setManualNote("Укажите хотя бы одну услугу.", "err"); return $("mSvcInput").focus(); }
     const day = $("mDate").value, time = $("mTime").value;
     const duration = Number($("mDuration").value) || 90;
-    if (!day || !time) { setNote("Укажите дату и время.", "err"); return; }
+    if (!day || !time) { setManualNote("Укажите дату и время.", "err"); return; }
     const comment = $("mNote").value.trim();
     const wasEditing = Boolean(editingId);
     if (DEMO) {
@@ -800,7 +874,7 @@ function setup() {
     }
     const button = $("mSave");
     button.disabled = true;
-    setNote(wasEditing ? "Сохраняем…" : "Добавляем…");
+    setManualNote(wasEditing ? "Сохраняем…" : "Добавляем…");
     try {
       const response = await fetch(API_URL + (wasEditing ? "/api/booking/update" : "/api/booking/manual"), {
         method: "POST",
@@ -815,7 +889,7 @@ function setup() {
       closeManual();
       await load();
       setNote(wasEditing ? "Запись изменена." : "Запись добавлена.", "ok");
-    } catch (error) { setNote(error.message, "err"); }
+    } catch (error) { setManualNote(error.message, "err"); }
     finally { button.disabled = false; }
   });
 }
@@ -841,6 +915,6 @@ async function init() {
 
 init().catch(error => { const box = $("status"); if (box) { box.textContent = "Ошибка: " + ((error && error.message) || error); box.className = "status err"; } });
 </script>
-<script src="../kit/pwa.js?v=202611151800"></script>
+<script src="../kit/pwa.js?v=202611201500"></script>
 </body>
 </html>
