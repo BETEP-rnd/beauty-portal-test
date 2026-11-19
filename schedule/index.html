@@ -5,7 +5,7 @@
 <script>
 (function () {
   try {
-    var build = "202611201500";
+    var build = "202611201600";
     if (localStorage.getItem("beauty.build") === build) return;
     localStorage.setItem("beauty.build", build);
     var jobs = [];
@@ -37,7 +37,7 @@
 <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
 <title>График работы — Мастерфолио</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500&family=Manrope:wght@400;500;600;700&family=Montserrat:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="../kit/kit.css?v=202611201500">
+<link rel="stylesheet" href="../kit/kit.css?v=202611201600">
 <script>try { var u = localStorage.getItem("beauty.ui"); if (u) document.documentElement.dataset.ui = u; } catch (e) {}</script>
 <style>
   .sched { display: flex; flex-direction: column; gap: 14px; }
@@ -52,14 +52,14 @@
   .month-total { color: var(--muted); font-size: 12px; }
   .month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
   .month-grid .wd { padding: 5px 0; border: 1px solid color-mix(in srgb, var(--line) 65%, var(--text)); border-radius: 6px; background: color-mix(in srgb, var(--accent) 7%, var(--field)); color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-align: center; text-transform: uppercase; }
-  .mday { position: relative; min-height: 32px; border: 1px solid color-mix(in srgb, var(--line) 65%, var(--text)); border-radius: 6px; background: var(--field); color: var(--text); font: inherit; font-size: 11px; cursor: pointer; }
+  .mday { position: relative; min-height: 40px; border: 1px solid color-mix(in srgb, var(--line) 65%, var(--text)); border-radius: 6px; background: var(--field); color: var(--text); font: inherit; font-size: 11px; cursor: pointer; }
   .mday span { position: absolute; top: 4px; left: 6px; }
-  .mday i { position: absolute; right: 4px; bottom: 3px; color: var(--accent); font-size: 9px; font-style: normal; font-weight: 700; }
+  .mday i { position: absolute; right: 5px; bottom: 2px; color: var(--accent); font-size: 18px; font-style: normal; font-weight: 700; line-height: 1; }
   .mday.today { border-color: var(--accent); }
   .mday.sel { background: var(--accent); color: var(--accent-ink); }
   .mday.sel i { color: inherit; }
   .mday.off { border-style: dashed; background: color-mix(in srgb, var(--bad) 7%, var(--field)); color: var(--muted); }
-  .mday.off i.offmark { color: var(--bad); font-size: 8px; letter-spacing: .02em; }
+  .mday.off i.offmark { color: var(--bad); font-size: 16px; letter-spacing: .02em; }
   .mday.sel.off i.offmark { color: inherit; }
   .daybar { padding: 14px 16px; gap: 12px; }
   .daynav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -307,7 +307,7 @@
 
 <script src="../kit/backgrounds.js?v=202611110807"></script>
 <script src="../kit/trends.js?v=202611110807"></script>
-<script src="../kit/kit.js?v=202611201500"></script>
+<script src="../kit/kit.js?v=202611201600"></script>
 <script>
 const API_URL = "https://api.masterfolio.ru";
 const $ = id => document.getElementById(id);
@@ -915,6 +915,6 @@ async function init() {
 
 init().catch(error => { const box = $("status"); if (box) { box.textContent = "Ошибка: " + ((error && error.message) || error); box.className = "status err"; } });
 </script>
-<script src="../kit/pwa.js?v=202611201500"></script>
+<script src="../kit/pwa.js?v=202611201600"></script>
 </body>
 </html>
