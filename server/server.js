@@ -152,9 +152,14 @@ async function priceSave(req, res) {
   if (!price || typeof price !== "object" || !Array.isArray(price.services)) {
     throw new HttpError(400, "Некорректный прайс.");
   }
-  const services = price.services.slice(0, 200).map(item => ({
+  const services = price.services.slice(0, 300).map((item, index) => ({
+    id: String(item && item.id || "").trim().slice(0, 80) || `service-${index + 1}`,
     name: String(item && item.name || "").trim().slice(0, 100),
-    price: String(item && item.price || "").trim().slice(0, 30)
+    price: String(item && item.price || "").trim().slice(0, 30),
+    duration: Math.max(15, Math.min(600, Number(item && item.duration) || 60)),
+    category: String(item && item.category || "").trim().slice(0, 60),
+    description: String(item && item.description || "").trim().slice(0, 300),
+    archived: Boolean(item && item.archived)
   })).filter(item => item.name);
   if (!services.length) throw new HttpError(400, "Добавьте хотя бы одну услугу.");
   const currency = String(price.currency || "руб.").trim().slice(0, 10) || "руб.";

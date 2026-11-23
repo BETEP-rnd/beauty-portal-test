@@ -5,7 +5,7 @@
 <script>
 (function () {
   try {
-    var build = "202611201800";
+    var build = "202611231200";
     if (localStorage.getItem("beauty.build") === build) return;
     localStorage.setItem("beauty.build", build);
     var jobs = [];
@@ -37,7 +37,7 @@
 <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
 <title>Конструктор прайс-листа</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Raleway:ital,wght@0,400;0,600;0,700;1,400&family=Manrope:wght@400;600;700&family=Nunito:ital,wght@0,400;0,700;1,400&family=Comfortaa:wght@400;700&family=Oswald:wght@400;600&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Lora:ital,wght@0,400;0,700;1,400&family=Prata&family=Forum&family=Poiret+One&family=Marck+Script&family=Bad+Script&family=Caveat:wght@400;700&family=Lobster&family=Amatic+SC:wght@400;700&display=swap">
-<link rel="stylesheet" href="../kit/kit.css?v=202611201800">
+<link rel="stylesheet" href="../kit/kit.css?v=202611231200">
 <script>try { var u = localStorage.getItem("beauty.ui"); if (u) document.documentElement.dataset.ui = u; } catch (e) {}</script>
 </head>
 <body>
@@ -119,7 +119,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="../kit/backgrounds.js?v=202611110807"></script>
 <script src="../kit/trends.js?v=202611110807"></script>
-<script src="../kit/kit.js?v=202611201800"></script>
+<script src="../kit/kit.js?v=202611231200"></script>
 <script>
 // ---------- справочник услуг (Лэшмейкер — список Ларисы с ценами, остальное — по Яндекс Картам, без цен) ----------
 const PROFS = [
@@ -168,6 +168,18 @@ let S = { theme: "price-0", format: "story", prof: "lash", title: "Прайс-л
   currency: "руб.", services: PROFS[0].services.slice(0, 7).map(([name, price]) => ({ name, price })), watermark: true, text: {}, contacts: null };
 const saved = Kit.loadJSON(KEY);
 if (saved && Array.isArray(saved.services)) ["theme", "format", "prof", "title", "subtitle", "currency", "services", "watermark", "text", "contacts"].forEach(k => { if (saved[k] != null) S[k] = saved[k]; });
+const serviceId = () => "service-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
+const normalizeService = (s, i) => ({
+  id: String(s && s.id || "").trim() || `service-${i + 1}`,
+  name: String(s && s.name || "").trim(),
+  price: String(s && s.price || "").trim(),
+  duration: Math.max(15, Math.min(600, Number(s && s.duration) || 60)),
+  category: String(s && s.category || "").trim(),
+  description: String(s && s.description || "").trim(),
+  archived: Boolean(s && s.archived)
+});
+const newService = (name, price) => ({ id: serviceId(), name, price, duration: 60, category: "", description: "", archived: false });
+S.services = (Array.isArray(S.services) ? S.services : []).map(normalizeService);
 if (!Kit.THEMES[S.theme]) S.theme = "price-0";
 Kit.claimTheme("price", S);                                     // один фон — один раздел
 const prof = Kit.loadProfile();
@@ -189,7 +201,7 @@ const canvas = $("cv");
 let ctx = canvas.getContext("2d"), dr = Kit.painter(ctx);            // let — превью фонов временно рисуют на своём холсте
 let H = 1920;
 function services(top, bottom, t, P) {
-  const items = S.services.filter(s => s.name.trim() || s.price.trim());
+  const items = S.services.filter(s => !s.archived && (s.name.trim() || s.price.trim()));
   const cw = W - 2 * P, avail = bottom - top, sn = style("services"), sp = style("prices");
   if (!items.length) { dr.centered("Добавьте услуги кнопкой «+»", W / 2, (top + bottom) / 2, '400 30px "Montserrat"', t.muted); return; }
   let s, rows, lineH, gap, total;
@@ -249,7 +261,7 @@ async function savePrice() {
   try {
     await fetch(API_URL + "/api/price", {
       method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ price: { services: S.services.map(s => ({ name: s.name, price: s.price })), currency: S.currency } })
+      body: JSON.stringify({ price: { services: S.services.map(s => ({ id: s.id, name: s.name, price: s.price, duration: s.duration, category: s.category, description: s.description, archived: s.archived })), currency: S.currency } })
     });
   } catch (error) {}
 }
@@ -262,7 +274,7 @@ async function syncPrice() {
     if (!response.ok) return;
     const data = await response.json();
     if (data.price && Array.isArray(data.price.services) && data.price.services.length) {
-      S.services = data.price.services.map(s => ({ name: String(s.name || ""), price: String(s.price || "") }));
+      S.services = data.price.services.map(normalizeService);
       if (data.price.currency) S.currency = data.price.currency;
       $("currency").value = S.currency;
       Kit.store.set(KEY, JSON.stringify(S));
@@ -279,16 +291,17 @@ const tabs = Kit.tabs($("tabs"), "price.tab", name => { if (name === "design") d
 
 // услуги
 function buildServices() {
-  const n = S.services.length;
-  $("svcs").innerHTML = n ? S.services.map((s, i) => `<div class="svc" data-i="${i}">
+  const active = S.services.map((s, i) => ({ s, i })).filter(({ s }) => !s.archived);
+  const n = active.length;
+  $("svcs").innerHTML = n ? active.map(({ s, i }, pos) => `<div class="svc" data-i="${i}">
       <input type="text" class="name" value="${esc(s.name)}" placeholder="Название услуги" aria-label="Услуга">
       <input type="text" class="price" value="${esc(s.price)}" placeholder="цена" inputmode="numeric" aria-label="Цена">
       <span class="tools">
-        <button type="button" class="icon" data-act="up" title="Выше" aria-label="Выше" ${i ? "" : "disabled"}>↑</button>
-        <button type="button" class="icon" data-act="down" title="Ниже" aria-label="Ниже" ${i < n - 1 ? "" : "disabled"}>↓</button>
-        <button type="button" class="icon del" data-act="del" title="Удалить услугу" aria-label="Удалить услугу">×</button>
+        <button type="button" class="icon" data-act="up" title="Выше" aria-label="Выше" ${pos ? "" : "disabled"}>↑</button>
+        <button type="button" class="icon" data-act="down" title="Ниже" aria-label="Ниже" ${pos < n - 1 ? "" : "disabled"}>↓</button>
+        <button type="button" class="icon del" data-act="del" title="В архив" aria-label="В архив">×</button>
       </span></div>`).join("")
-    : `<div class="empty">Пока пусто — добавьте первую услугу.</div>`;
+    : `<div class="empty">Нет активных услуг. Добавьте их или верните из архива в «Мои услуги».</div>`;
 }
 $("svcs").addEventListener("input", e => {
   const row = e.target.closest(".svc"); if (!row) return;
@@ -297,16 +310,18 @@ $("svcs").addEventListener("input", e => {
 $("svcs").addEventListener("click", e => {
   const b = e.target.closest("button[data-act]"); if (!b) return;
   const i = +b.closest(".svc").dataset.i, L = S.services;
-  if (b.dataset.act === "del") L.splice(i, 1);
-  if (b.dataset.act === "up" && i > 0) [L[i - 1], L[i]] = [L[i], L[i - 1]];
-  if (b.dataset.act === "down" && i < L.length - 1) [L[i + 1], L[i]] = [L[i], L[i + 1]];
+  const active = L.map((s, index) => ({ s, index })).filter(({ s }) => !s.archived);
+  const pos = active.findIndex(({ index }) => index === i);
+  if (b.dataset.act === "del") L[i].archived = true;
+  if (b.dataset.act === "up" && pos > 0) { const j = active[pos - 1].index; [L[j], L[i]] = [L[i], L[j]]; }
+  if (b.dataset.act === "down" && pos < active.length - 1) { const j = active[pos + 1].index; [L[j], L[i]] = [L[i], L[j]]; }
   buildServices(); changed();
 });
 // подбор услуг: поиск, профессии кнопками, услуги плитками; нажатие добавляет (или убирает), панель остаётся открытой
 let pkProf = S.prof;
 const key = n => n.trim().toLowerCase();
 function buildPicker() {
-  const q = key($("pkQ").value), have = new Set(S.services.map(s => key(s.name)));
+  const q = key($("pkQ").value), have = new Set(S.services.filter(s => !s.archived).map(s => key(s.name)));
   const order = [...PROFS].sort((a, b) => (b.id === S.prof) - (a.id === S.prof));
   $("pkProfs").hidden = !!q;                                     // при поиске — по всем профессиям сразу
   $("pkProfs").innerHTML = order.map(p => `<button type="button" class="chip" data-p="${p.id}" aria-pressed="${p.id === pkProf}">${esc(p.name)}</button>`).join("");
@@ -322,7 +337,7 @@ function showPicker(on) {
   if (on) { pkProf = S.prof; $("pkQ").value = ""; buildPicker(); }
 }
 function addCustom(name) {
-  S.services.push({ name, price: "" }); showPicker(false); buildServices(); changed();
+  S.services.push(newService(name, "")); showPicker(false); buildServices(); changed();
   const rows = $("svcs").querySelectorAll(".svc"), last = rows[rows.length - 1];
   if (last) last.querySelector(name ? ".price" : ".name").focus();
 }
@@ -334,14 +349,14 @@ $("pkProfs").addEventListener("click", e => { const b = e.target.closest("[data-
 $("pkTiles").addEventListener("click", e => {
   if (e.target.closest("[data-custom]")) return addCustom($("pkQ").value.trim());
   const b = e.target.closest(".tile"); if (!b) return;
-  const n = b.dataset.n, i = S.services.findIndex(s => key(s.name) === key(n));
-  if (i >= 0) S.services.splice(i, 1);
-  else { const svc = PROFS.flatMap(p => p.services).find(([x]) => x === n); S.services.push({ name: n, price: svc ? svc[1] : "" }); }
+  const n = b.dataset.n, existing = S.services.find(s => key(s.name) === key(n));
+  if (existing) existing.archived = !existing.archived;
+  else { const svc = PROFS.flatMap(p => p.services).find(([x]) => x === n); S.services.push(newService(n, svc ? svc[1] : "")); }
   // плитку меняем на месте (без пересборки списка), а сдвиг от новой строки прайса над панелью гасим прокруткой — экран не дёргается
   const top = $("picker").getBoundingClientRect().top;
   buildServices(); changed();
   window.scrollBy(0, $("picker").getBoundingClientRect().top - top);
-  const on = i < 0, svc = PROFS.flatMap(p => p.services).find(([x]) => x === n);
+  const on = existing ? !existing.archived : true, svc = PROFS.flatMap(p => p.services).find(([x]) => x === n);
   b.setAttribute("aria-pressed", on); b.title = on ? "Убрать из прайса" : "Добавить в прайс";
   b.querySelector("span").textContent = on ? "✓ добавлено" : svc && svc[1] ? `${group(svc[1])} ${S.currency}` : "цена — своя";
 });
@@ -360,7 +375,7 @@ $("currency").addEventListener("change", e => { S.currency = e.target.value; cha
 Kit.output({ download: $("download"), share: $("share"), status: $("status") }, canvas, draw,
   () => `Прайс_${Kit.safeName(prof.master)}.png`,
   () => {
-    const err = Kit.profileError(prof) || (S.services.some(s => s.name.trim()) ? "" : "Добавьте хотя бы одну услугу.");
+    const err = Kit.profileError(prof) || (S.services.some(s => !s.archived && s.name.trim()) ? "" : "Добавьте хотя бы одну активную услугу.");
     if (err) { tabs.show("content"); }
     return err;
   });
@@ -372,6 +387,6 @@ buildServices(); tabs.show(tabs.current); changed(); syncPrice();
 Promise.all([...fonts.fontsInUse(), '600 84px "Cormorant Garamond"', '128px "Marck Script"', '600 30px "Montserrat"'].map(f => document.fonts.load(f, "Прайс-лист 0123456789")))
   .catch(() => {}).then(() => { changed(); if (tabs.current === "design") design.show(); });
 </script>
-<script src="../kit/pwa.js?v=202611201800"></script>
+<script src="../kit/pwa.js?v=202611231200"></script>
 </body>
 </html>

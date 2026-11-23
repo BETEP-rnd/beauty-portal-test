@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f8f2ec">
+<meta name="application-name" content="Мастерфолио">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Мастерфолио">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<title>Мои услуги — Мастерфолио</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500&family=Manrope:wght@400;500;600;700&family=Montserrat:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../kit/kit.css?v=202611231200">
+<script>try { var u = localStorage.getItem("beauty.ui"); if (u) document.documentElement.dataset.ui = u; } catch (e) {}</script>
+<style>
+  .svc-page { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+  .svc-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .svc-top h2 { margin: 0; font-family: var(--display); font-size: 30px; font-weight: 500; }
+  .svc-top .btn { margin-left: auto; }
+  .svc-tabs { display: flex; border: 1px solid var(--line); border-radius: 99px; overflow: hidden; width: max-content; }
+  .svc-tabs button { border: 0; background: var(--field); color: var(--text); font: inherit; font-size: 13px; padding: 8px 14px; cursor: pointer; }
+  .svc-tabs button + button { border-left: 1px solid var(--line); }
+  .svc-tabs button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  .svc-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: flex; gap: 14px; align-items: flex-start; }
+  .svc-card .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .svc-card b { color: var(--accent); font-size: 17px; }
+  .svc-card .meta { color: var(--text); font-size: 14px; }
+  .svc-card .note { color: var(--muted); font-size: 13px; line-height: 1.45; }
+  .svc-card .actions { display: flex; flex-direction: column; gap: 6px; flex: none; }
+  .svc-card button { border: 1px solid var(--line); border-radius: 99px; background: var(--panel); color: var(--text); font: inherit; font-size: 12px; padding: 7px 10px; cursor: pointer; }
+  .svc-card button:hover { border-color: var(--accent); color: var(--accent); }
+  .svc-form { background: var(--panel); border: 1px solid var(--accent); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .svc-form h3 { margin: 0; font-family: var(--display); font-size: 24px; font-weight: 500; }
+  .svc-form .row { grid-template-columns: 1fr 1fr; }
+  .svc-form textarea { width: 100%; min-height: 64px; resize: vertical; font: inherit; font-size: 14px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); color: var(--text); }
+  .svc-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .svc-empty { color: var(--muted); font-size: 14px; padding: 16px 0; }
+  .svc-status { min-height: 20px; color: var(--muted); font-size: 13px; }
+  @media (max-width: 560px) {
+    .svc-card { flex-direction: column; }
+    .svc-card .actions { flex-direction: row; flex-wrap: wrap; }
+    .svc-form .row { grid-template-columns: 1fr; }
+    .svc-top h2 { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Мои услуги</h1>
+    <nav><a href="../">Главная</a><a href="../cabinet/">Кабинет</a><a href="../schedule/">График</a><a href="../price/">Прайс-лист</a><a href="../services/" data-services-link="1" aria-current="page">Мои услуги</a><a href="../windows/">Свободные окошки</a><a href="../certs/">Сертификаты</a><a href="../clients/">Мои клиенты</a></nav>
+  </header>
+
+  <main class="svc-page">
+    <div class="svc-top">
+      <div class="svc-tabs" id="svcTabs" role="tablist">
+        <button type="button" data-tab="active" aria-pressed="true">Активные</button>
+        <button type="button" data-tab="archive" aria-pressed="false">Архив</button>
+      </div>
+      <button class="btn" type="button" id="addService">+ Услуга</button>
+    </div>
+    <div class="svc-status" id="status" role="status"></div>
+    <div class="svc-form" id="form" hidden>
+      <h3 id="formTitle">Новая услуга</h3>
+      <div class="field"><label for="name" class="req">Название</label><input id="name" type="text" maxlength="100" placeholder="Например, Объём 1,5D–2D"></div>
+      <div class="row">
+        <div class="field"><label for="price">Цена</label><input id="price" type="text" maxlength="30" inputmode="numeric" placeholder="3300"></div>
+        <div class="field"><label for="duration">Длительность, мин</label><input id="duration" type="number" min="15" max="600" step="15" value="60"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label for="category">Категория</label><input id="category" type="text" maxlength="60" placeholder="Например, Наращивание"></div>
+        <div class="field"><label for="description">Описание</label><input id="description" type="text" maxlength="300" placeholder="Коротко для себя"></div>
+      </div>
+      <div class="svc-actions"><button class="btn" type="button" id="saveService">Сохранить</button><button class="btn ghost" type="button" id="cancelService">Отмена</button></div>
+    </div>
+    <div id="list"></div>
+    <div class="svc-empty" id="empty" hidden>Услуг пока нет. Добавьте первую.</div>
+  </main>
+</div>
+
+<script src="../kit/backgrounds.js?v=202611110807"></script>
+<script src="../kit/trends.js?v=202611110807"></script>
+<script src="../kit/kit.js?v=202611231200"></script>
+<script>
+const API_URL = "https://api.masterfolio.ru";
+const KEY = "price.v1";
+const $ = id => document.getElementById(id);
+const normalize = (s, i) => ({
+  id: String(s && s.id || "").trim() || `service-${i + 1}`,
+  name: String(s && s.name || "").trim(),
+  price: String(s && s.price || "").trim(),
+  duration: Math.max(15, Math.min(600, Number(s && s.duration) || 60)),
+  category: String(s && s.category || "").trim(),
+  description: String(s && s.description || "").trim(),
+  archived: Boolean(s && s.archived)
+});
+const newId = () => "service-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
+let saved = Kit.loadJSON(KEY) || {};
+let S = { services: Array.isArray(saved.services) ? saved.services.map(normalize) : [], currency: saved.currency || "руб." };
+let signedIn = false, tab = "active", editingId = "";
+function local() { Kit.store.set(KEY, JSON.stringify({ ...saved, services: S.services, currency: S.currency })); }
+async function serverSave() {
+  if (!signedIn) { $("status").textContent = "Услуги сохранены в этом браузере. Войдите, чтобы сохранить в аккаунт."; return; }
+  $("status").textContent = "Сохраняю…";
+  try {
+    const response = await fetch(API_URL + "/api/price", {
+      method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ price: { services: S.services, currency: S.currency } })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Не удалось сохранить услуги.");
+    $("status").textContent = "Сохранено.";
+  } catch (error) { $("status").textContent = error.message; }
+}
+function render() {
+  const list = S.services.filter(s => (tab === "archive" ? s.archived : !s.archived));
+  $("empty").hidden = list.length > 0;
+  $("empty").textContent = tab === "archive" ? "Архив пуст." : "Активных услуг пока нет.";
+  $("list").innerHTML = list.map(s => `<article class="svc-card" data-id="${Kit.esc(s.id)}">
+    <div class="body"><b>${Kit.esc(s.name)}</b>
+      <span class="meta">${s.price ? Kit.esc(s.price) + " " + Kit.esc(S.currency || "руб.") : "Цена не указана"} · ${s.duration} мин${s.category ? " · " + Kit.esc(s.category) : ""}</span>
+      ${s.description ? `<span class="note">${Kit.esc(s.description)}</span>` : ""}
+    </div>
+    <div class="actions"><button type="button" data-edit="${Kit.esc(s.id)}">Изменить</button>
+      <button type="button" data-archive="${Kit.esc(s.id)}">${s.archived ? "Вернуть" : "В архив"}</button></div>
+  </article>`).join("");
+  $("svcTabs").querySelectorAll("[data-tab]").forEach(b => b.setAttribute("aria-pressed", b.dataset.tab === tab));
+}
+function openForm(id) {
+  editingId = id || "";
+  const s = S.services.find(x => x.id === editingId) || {};
+  $("formTitle").textContent = editingId ? "Изменить услугу" : "Новая услуга";
+  $("name").value = s.name || ""; $("price").value = s.price || ""; $("duration").value = s.duration || 60;
+  $("category").value = s.category || ""; $("description").value = s.description || "";
+  $("form").hidden = false; $("status").textContent = "";
+  $("name").focus();
+}
+function closeForm() { $("form").hidden = true; editingId = ""; }
+$("addService").addEventListener("click", () => openForm(""));
+$("cancelService").addEventListener("click", closeForm);
+$("svcTabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (!b) return; tab = b.dataset.tab; render(); });
+$("list").addEventListener("click", async e => {
+  const edit = e.target.closest("[data-edit]"), archive = e.target.closest("[data-archive]");
+  if (edit) return openForm(edit.dataset.edit);
+  if (archive) {
+    const s = S.services.find(x => x.id === archive.dataset.archive); if (!s) return;
+    s.archived = !s.archived; local(); render(); await serverSave();
+  }
+});
+$("saveService").addEventListener("click", async () => {
+  const name = $("name").value.trim();
+  if (!name) { $("status").textContent = "Укажите название услуги."; $("name").focus(); return; }
+  const data = {
+    name, price: $("price").value.trim(),
+    duration: Math.max(15, Math.min(600, Number($("duration").value) || 60)),
+    category: $("category").value.trim(), description: $("description").value.trim(),
+    archived: false
+  };
+  if (editingId) Object.assign(S.services.find(x => x.id === editingId), data);
+  else S.services.push({ id: newId(), ...data });
+  local(); closeForm(); render(); await serverSave();
+});
+(async function load() {
+  render();
+  try {
+    const me = await fetch(API_URL + "/api/auth/me", { credentials: "include" });
+    if (!me.ok) return;
+    signedIn = true;
+    const response = await fetch(API_URL + "/api/price", { credentials: "include" });
+    if (!response.ok) return;
+    const data = await response.json();
+    if (data.price && Array.isArray(data.price.services) && data.price.services.length) {
+      S.services = data.price.services.map(normalize);
+      if (data.price.currency) S.currency = data.price.currency;
+      local(); render();
+    } else if (S.services.length) await serverSave();
+  } catch (error) {}
+})();
+</script>
+<script src="../kit/pwa.js?v=202611231200"></script>
+</body>
+</html>
