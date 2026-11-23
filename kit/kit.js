@@ -1017,6 +1017,16 @@
             nav.appendChild(link);
           } else admin.hidden = false;
         } else if (admin) admin.remove();
+        let services = nav.querySelector("[data-services-link]");
+        if (loggedIn) {
+          if (!services) {
+            services = document.createElement("a");
+            services.dataset.servicesLink = "1";
+            services.href = "../services/";
+            services.textContent = "Мои услуги";
+            nav.insertBefore(services, exit || null);
+          } else services.hidden = false;
+        } else if (services) services.remove();
       });
     } catch (error) {}
   }
