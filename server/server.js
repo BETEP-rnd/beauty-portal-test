@@ -159,7 +159,8 @@ async function priceSave(req, res) {
     duration: Math.max(15, Math.min(600, Number(item && item.duration) || 60)),
     category: String(item && item.category || "").trim().slice(0, 60),
     description: String(item && item.description || "").trim().slice(0, 300),
-    archived: Boolean(item && item.archived)
+    archived: Boolean(item && item.archived),
+    inPrice: Boolean(item && item.inPrice !== false)
   })).filter(item => item.name);
   if (!services.length) throw new HttpError(400, "Добавьте хотя бы одну услугу.");
   const currency = String(price.currency || "руб.").trim().slice(0, 10) || "руб.";
