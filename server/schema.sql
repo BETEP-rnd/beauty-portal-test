@@ -173,3 +173,22 @@ ALTER TABLE masters ADD CONSTRAINT masters_plan_check CHECK (plan IN ('trial', '
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS trial_until timestamptz NOT NULL DEFAULT (now() + interval '7 days');
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS plan_until timestamptz;
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS blocked boolean NOT NULL DEFAULT false;
+
+
+CREATE TABLE IF NOT EXISTS support_messages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  master_id uuid REFERENCES masters(id) ON DELETE SET NULL,
+  topic text NOT NULL DEFAULT 'other' CHECK (topic IN ('problem', 'question', 'idea', 'other')),
+  name varchar(60),
+  contact text,
+  message text NOT NULL,
+  page text,
+  status text NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'done')),
+  consent_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  handled_at timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS support_messages_status_idx ON support_messages (status, created_at DESC);
+
+ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS consent_at timestamptz NOT NULL DEFAULT now();

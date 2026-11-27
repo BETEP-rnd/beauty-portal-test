@@ -1,7 +1,7 @@
-const CACHE = "mf-v202611231300";
+const CACHE = "mf-v202611281200";
 const BASE = new URL("./", self.location).href;
 const CORE = [
-  "", "index.html", "auth/", "services/", "booking/", "cabinet/", "certs/", "clients/", "price/", "schedule/", "windows/",
+  "", "index.html", "auth/", "services/", "booking/", "cabinet/", "certs/", "clients/", "help/", "price/", "schedule/", "windows/",
   "offline.html", "manifest.webmanifest",
   "kit/kit.css", "kit/kit.js", "kit/pwa.js", "kit/backgrounds.js", "kit/trends.js",
   "kit/grain.svg", "kit/paper-leaves.png", "kit/herbs-light.svg", "kit/herbs-dark.svg",
