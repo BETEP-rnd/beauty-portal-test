@@ -714,6 +714,89 @@ async function certUse(req, res) {
   }
 }
 
+const SUPPORT_TOPICS = { problem: "Проблема", question: "Вопрос", idea: "Предложение", other: "Другое" };
+
+async function supportNotify(row) {
+  if (!process.env.TELEGRAM_BOT_TOKEN) return;
+  try {
+    const result = await pool.query(
+      "SELECT l.chat_id FROM telegram_links l JOIN masters m ON m.id = l.master_id WHERE m.role = 'admin'"
+    );
+    if (!result.rows.length) return;
+    const label = SUPPORT_TOPICS[row.topic] || SUPPORT_TOPICS.other;
+    const lines = [
+      "Новое обращение в поддержку",
+      "Тема: " + label,
+      row.name ? "Имя: " + row.name : "",
+      row.contact ? "Контакт: " + row.contact : "",
+      row.master_name ? "Аккаунт: " + row.master_name : "",
+      "",
+      row.message
+    ].filter(Boolean);
+    const text = lines.join("\n").slice(0, 3500);
+    await Promise.allSettled(result.rows.map(item => telegramApi("sendMessage", { chat_id: item.chat_id, text }, 5000)));
+  } catch (error) {}
+}
+
+async function supportCreate(req, res) {
+  const data = await body(req);
+  const topic = Object.prototype.hasOwnProperty.call(SUPPORT_TOPICS, data.topic) ? data.topic : "other";
+  const message = String(data.message || "").trim().slice(0, 2000);
+  const name = String(data.name || "").trim().slice(0, 60);
+  const contact = String(data.contact || "").trim().slice(0, 120);
+  const page = String(data.page || "").trim().slice(0, 300);
+  if (message.length < 10) throw new HttpError(400, "Опишите ситуацию подробнее — не менее 10 символов.");
+  if (data.consent !== true) throw new HttpError(400, "Нужно согласие на обработку персональных данных.");
+  let master = null;
+  try { master = await currentMaster(req); } catch (error) {}
+  if (!master && !contact) throw new HttpError(400, "Укажите почту или телефон для ответа.");
+  const result = await pool.query(
+    "INSERT INTO support_messages (master_id, topic, name, contact, message, page) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at",
+    [master ? master.id : null, topic, name || null, contact || null, message, page || null]
+  );
+  supportNotify({
+    topic,
+    message,
+    name: name || (master && master.name) || "",
+    contact: contact || (master && master.email) || (master && master.phone) || "",
+    master_name: master ? master.name : ""
+  }).catch(() => {});
+  json(res, 200, { ok: true, id: result.rows[0].id });
+}
+
+async function adminSupportList(req, res) {
+  await requireAdmin(req);
+  const url = new URL(req.url, "http://localhost");
+  const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 100));
+  const status = url.searchParams.get("status");
+  const params = [limit];
+  let where = "";
+  if (status === "new" || status === "done") {
+    params.unshift(status);
+    where = "WHERE s.status = $1";
+  }
+  const result = await pool.query(
+    "SELECT s.id, s.master_id, s.topic, s.name, s.contact, s.message, s.page, s.status, s.created_at, s.handled_at, m.name AS master_name, m.email AS master_email, m.phone AS master_phone FROM support_messages s LEFT JOIN masters m ON m.id = s.master_id " + where + " ORDER BY s.created_at DESC LIMIT $" + params.length,
+    params
+  );
+  const counts = await pool.query("SELECT count(*) FILTER (WHERE status = 'new')::int AS fresh, count(*)::int AS total FROM support_messages");
+  json(res, 200, { messages: result.rows, counts: counts.rows[0] });
+}
+
+async function adminSupportSave(req, res) {
+  await requireAdmin(req);
+  const data = await body(req);
+  const id = String(data.id || "");
+  const status = data.status === "done" ? "done" : data.status === "new" ? "new" : "";
+  if (!/^[0-9a-f-]{36}$/i.test(id) || !status) throw new HttpError(400, "Некорректные данные обращения.");
+  const result = await pool.query(
+    "UPDATE support_messages SET status = $1, handled_at = CASE WHEN $1 = 'done' THEN now() ELSE NULL END WHERE id = $2 RETURNING id, status, handled_at",
+    [status, id]
+  );
+  if (!result.rows.length) throw new HttpError(404, "Обращение не найдено.");
+  json(res, 200, { message: result.rows[0] });
+}
+
 function requireTelegram() {
   if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_BOT_USERNAME || !process.env.OTP_SECRET) {
     throw new HttpError(503, "Telegram-бот ещё не подключён.");
@@ -1341,6 +1424,9 @@ async function handle(req, res) {
   if (url.pathname === "/api/booking/update" && req.method === "POST") { rateLimit(req, "booking-update"); return await bookingUpdate(req, res); }
   if (url.pathname === "/api/admin/masters" && req.method === "GET") { rateLimit(req, "admin-masters", 60); return await adminMasters(req, res); }
   if (url.pathname === "/api/admin/master" && req.method === "POST") { rateLimit(req, "admin-master", 30); return await adminMasterSave(req, res); }
+  if (url.pathname === "/api/support" && req.method === "POST") { rateLimit(req, "support", 5); return await supportCreate(req, res); }
+  if (url.pathname === "/api/admin/support" && req.method === "GET") { rateLimit(req, "admin-support", 60); return await adminSupportList(req, res); }
+  if (url.pathname === "/api/admin/support" && req.method === "POST") { rateLimit(req, "admin-support-save", 60); return await adminSupportSave(req, res); }
   throw new HttpError(404, "Адрес не найден.");
 }
 

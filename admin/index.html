@@ -31,6 +31,24 @@
   .admin-controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .admin-controls select, .admin-controls input { font: inherit; font-size: 13px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--text); max-width: 100%; }
   .admin-controls input[type="date"] { width: 135px; }
+  .admin-support { display: flex; flex-direction: column; gap: 10px; margin-top: 28px; }
+  .support-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .support-head h2 { margin: 0; font-family: var(--display); font-size: 26px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--text); }
+  .support-head .admin-count { margin-left: auto; }
+  .support-head button { border: 1px solid var(--line); border-radius: 99px; background: var(--panel); color: var(--text); font: inherit; font-size: 13px; padding: 8px 13px; cursor: pointer; }
+  .support-head button:hover { border-color: var(--accent); color: var(--accent); }
+  .support-list { display: flex; flex-direction: column; gap: 10px; }
+  .support-row { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .support-row.done { opacity: .62; }
+  .support-row .topline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .support-row .topic { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); border: 1px solid currentColor; border-radius: 99px; padding: 3px 8px; }
+  .support-row .when { margin-left: auto; color: var(--muted); font-size: 12px; }
+  .support-row .who { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+  .support-row .text { font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .support-row .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+  .support-row .actions button { border: 1px solid var(--line); border-radius: 99px; background: var(--panel); color: var(--text); font: inherit; font-size: 12px; padding: 7px 10px; cursor: pointer; }
+  .support-row .actions button:hover { border-color: var(--accent); color: var(--accent); }
+  .support-row .actions button:disabled { opacity: .45; cursor: default; }
   @media (max-width: 900px) { .admin-row { grid-template-columns: 1fr; gap: 10px; } }
 </style>
 </head>
@@ -38,7 +56,7 @@
 <div class="wrap">
   <header class="top">
     <h1>Админ-панель</h1>
-    <nav><a href="../cabinet/">Кабинет</a><a href="../">Главная</a></nav>
+    <nav><a href="../cabinet/">Кабинет</a><a href="../help/">Помощь</a><a href="../">Главная</a></nav>
   </header>
 
   <div class="admin-gate" id="gate" hidden></div>
@@ -51,6 +69,15 @@
     </div>
     <div class="admin-status" id="status"></div>
     <div class="admin-list" id="list"></div>
+    <section class="admin-support">
+      <div class="support-head">
+        <h2>Обращения</h2>
+        <span class="admin-count" id="supportCount"></span>
+        <button type="button" id="supportRefresh">Обновить</button>
+      </div>
+      <div class="admin-status" id="supportStatus"></div>
+      <div class="support-list" id="supportList"></div>
+    </section>
   </section>
 </div>
 <script>
@@ -147,6 +174,60 @@ $("list").addEventListener("click", event => {
     if (confirm(blocked ? "Заблокировать мастера?" : "Разблокировать мастера?")) saveRow(row, { action: "block", blocked });
   }
 });
+let supportRows = [];
+const TOPIC_LABELS = { problem: "Проблема", question: "Вопрос", idea: "Предложение", other: "Другое" };
+function fmtWhen(value) {
+  if (!value) return "";
+  try { return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value)); } catch (error) { return ""; }
+}
+function topicLabel(topic) { return TOPIC_LABELS[topic] || TOPIC_LABELS.other; }
+function renderSupport() {
+  $("supportList").innerHTML = supportRows.map(item => {
+    const done = item.status === "done";
+    return `<article class="support-row${done ? " done" : ""}" data-id="${esc(item.id)}">
+      <div class="topline"><span class="topic">${esc(topicLabel(item.topic))}</span><span class="when">${esc(fmtWhen(item.created_at))}</span></div>
+      <div class="who">${esc(item.name || "Без имени")}${item.contact ? " · " + esc(item.contact) : ""}${item.master_name ? " · аккаунт: " + esc(item.master_name) : ""}</div>
+      <div class="text">${esc(item.message)}</div>
+      ${item.page ? `<div class="who">Страница: ${esc(item.page)}</div>` : ""}
+      <div class="actions"><button type="button" data-support="${done ? "new" : "done"}">${done ? "Вернуть в новые" : "Отметить обработанным"}</button></div>
+    </article>`;
+  }).join("");
+}
+async function loadSupport() {
+  $("supportStatus").textContent = "Загружаю…";
+  try {
+    const response = await fetch(API + "/api/admin/support?limit=100", { credentials: "include" });
+    if (response.status === 404) { $("supportStatus").textContent = "Раздел появится после обновления сервера."; return; }
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) { $("supportStatus").textContent = data.error || "Не удалось загрузить обращения."; return; }
+    supportRows = data.messages || [];
+    $("supportCount").textContent = data.counts ? "Новых: " + data.counts.fresh + " из " + data.counts.total : "";
+    $("supportStatus").textContent = supportRows.length ? "" : "Обращений пока нет.";
+    renderSupport();
+  } catch (error) {
+    $("supportStatus").textContent = "Не удалось связаться с сервером.";
+  }
+}
+$("supportRefresh").addEventListener("click", loadSupport);
+$("supportList").addEventListener("click", async event => {
+  const button = event.target.closest("button[data-support]");
+  const row = button && button.closest(".support-row");
+  if (!button || !row) return;
+  button.disabled = true;
+  $("supportStatus").textContent = "Сохраняю…";
+  try {
+    const response = await fetch(API + "/api/admin/support", {
+      method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: row.dataset.id, status: button.dataset.support })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) { $("supportStatus").textContent = data.error || "Не удалось сохранить."; button.disabled = false; return; }
+    await loadSupport();
+  } catch (error) {
+    $("supportStatus").textContent = "Не удалось связаться с сервером.";
+    button.disabled = false;
+  }
+});
 (async function init() {
   try {
     const response = await fetch(API + "/api/auth/me", { credentials: "include" });
@@ -156,6 +237,7 @@ $("list").addEventListener("click", event => {
     if (!data.access || data.access.isAdmin !== true) { showGate('Доступ только для администратора. <a href="../cabinet/">Вернуться в кабинет</a>'); return; }
     $("app").hidden = false;
     await load("");
+    await loadSupport();
   } catch (error) {
     showGate("Не удалось связаться с сервером. Проверьте интернет и обновите страницу.");
   }

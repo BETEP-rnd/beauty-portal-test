@@ -926,7 +926,7 @@
       const link = event.target.closest("header.top nav a");
       if (!link) return;
       const href = link.getAttribute("href") || "";
-      if (href.indexOf("cabinet") >= 0 || href.indexOf("auth") >= 0 || href === "../" || href === "/") return;
+      if (href.indexOf("cabinet") >= 0 || href.indexOf("auth") >= 0 || href.indexOf("help") >= 0 || href === "../" || href === "/") return;
       event.preventDefault();
       accessNotice();
     }, true);
@@ -1006,6 +1006,14 @@
         } else if (exit) {
           exit.remove();
         }
+        let help = nav.querySelector("[data-help-link]");
+        if (!help) {
+          help = document.createElement("a");
+          help.dataset.helpLink = "1";
+          help.href = "../help/";
+          help.textContent = "Помощь";
+          nav.insertBefore(help, exit || null);
+        }
         const admin = nav.querySelector("[data-admin-link]");
         if (loggedIn && currentAccess && currentAccess.isAdmin) {
           if (!admin) {
@@ -1024,7 +1032,7 @@
             services.dataset.servicesLink = "1";
             services.href = "../services/";
             services.textContent = "Мои услуги";
-            nav.insertBefore(services, exit || null);
+            nav.insertBefore(services, help || exit || null);
           } else services.hidden = false;
         } else if (services) services.remove();
       });

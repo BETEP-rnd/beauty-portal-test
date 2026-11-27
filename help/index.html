@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<script>
+(function () {
+  try {
+    var build = "202611281200";
+    if (localStorage.getItem("beauty.build") === build) return;
+    localStorage.setItem("beauty.build", build);
+    var jobs = [];
+    if ("serviceWorker" in navigator && navigator.serviceWorker.getRegistrations) {
+      jobs.push(navigator.serviceWorker.getRegistrations().then(function (regs) {
+        return Promise.all(regs.map(function (reg) { return reg.unregister(); }));
+      }));
+    }
+    if (window.caches) {
+      jobs.push(caches.keys().then(function (keys) {
+        return Promise.all(keys.map(function (key) { return caches.delete(key); }));
+      }));
+    }
+    if (!jobs.length) return;
+    Promise.all(jobs).catch(function () {}).then(function () { location.reload(); });
+  } catch (error) {}
+})();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f8f2ec">
+<meta name="application-name" content="Мастерфолио">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Мастерфолио">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<meta name="description" content="Помощь Мастерфолио: частые вопросы и форма обращения в поддержку.">
+<title>Помощь — Мастерфолио</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;600;700&family=Montserrat:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../kit/kit.css?v=202611281200">
+<script>try { var u = localStorage.getItem("beauty.ui"); if (u) document.documentElement.dataset.ui = u; } catch (e) {}</script>
+<style>
+  .help-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 24px; align-items: start; }
+  .help-main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  .help-intro { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; display: flex; flex-direction: column; gap: 8px; }
+  .help-intro h2 { margin: 0; font-family: var(--display); font-size: 30px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--text); }
+  .help-intro p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.6; }
+  .help-intro .btn { align-self: flex-start; text-decoration: none; }
+  .faq-list { display: flex; flex-direction: column; gap: 8px; }
+  .qa { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 0 16px; }
+  .qa summary { cursor: pointer; padding: 14px 0; font-weight: 600; font-size: 15px; line-height: 1.4; list-style: none; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .qa summary::-webkit-details-marker { display: none; }
+  .qa summary::after { content: "+"; color: var(--accent); font-size: 20px; line-height: 1; flex: none; }
+  .qa[open] summary::after { content: "–"; }
+  .qa p { margin: 0 0 14px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+  .qa p a { color: var(--accent); }
+  .help-side { min-width: 0; }
+  .form-card { position: sticky; top: calc(16px + env(safe-area-inset-top, 0px)); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .form-card[hidden] { display: none; }
+  .form-card h2 { margin: 0; font-family: var(--display); font-size: 26px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--text); }
+  .form-card textarea { width: 100%; min-height: 120px; resize: vertical; font: inherit; font-size: 15px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); color: var(--text); }
+  .form-card .counter { font-size: 12px; color: var(--muted); text-align: right; }
+  .help-done { gap: 10px; }
+  .help-done p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+  @media (max-width: 900px) {
+    .help-grid { grid-template-columns: 1fr; }
+    .form-card { position: static; }
+  }
+  @media (max-width: 560px) {
+    .help-grid .row { grid-template-columns: 1fr; }
+    .help-intro h2 { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Помощь</h1>
+    <nav><a href="../">Главная</a><a href="../cabinet/">Кабинет</a><a href="../schedule/">График</a><a href="../price/">Прайс-лист</a><a href="../services/" data-services-link="1">Мои услуги</a><a href="../windows/">Свободные окошки</a><a href="../certs/">Сертификаты</a><a href="../clients/">Мои клиенты</a><a href="../help/" data-help-link="1" aria-current="page">Помощь</a></nav>
+  </header>
+
+  <main class="help-grid">
+    <section class="help-main">
+      <div class="help-intro">
+        <h2>Чем помочь?</h2>
+        <p>Ниже — ответы на частые вопросы. Если что-то не работает или есть предложение, напишите в поддержку. Обращение увидит администратор сервиса.</p>
+        <a class="btn" href="#supportForm">Написать в поддержку</a>
+      </div>
+
+      <div class="faq-list">
+        <details class="qa">
+          <summary>Как клиенту записаться онлайн?</summary>
+          <p>Откройте ссылку или QR-код мастера. Выберите услугу и удобное время, укажите имя и телефон, отметьте согласие и отправьте заявку. Мастер подтвердит запись. Заявка держится 5 часов, после подтверждения придёт уведомление в Telegram, если вы подключили его при записи.</p>
+        </details>
+        <details class="qa">
+          <summary>Как мастеру включить онлайн-запись?</summary>
+          <p>Войдите в кабинет, откройте раздел «Онлайн-запись» и опубликуйте страницу. Онлайн-запись доступна на пробном периоде и тарифе «Премиум». На «Стандарте» остальные разделы работают, но публикация записи недоступна.</p>
+        </details>
+        <details class="qa">
+          <summary>Как добавить услугу и попасть в прайс-лист?</summary>
+          <p>Откройте «Мои услуги», нажмите «+ Услуга» и укажите название, цену и длительность. Затем в «Прайс-листе» нажмите «+ Добавить услугу» и выберите нужные услуги из справочника. Услуги из архива в прайс не попадают.</p>
+        </details>
+        <details class="qa">
+          <summary>Как настроить график и выходной?</summary>
+          <p>В разделе «График» выберите день и укажите начало и конец работы. Кнопка «Скопировать с прошлого дня» переносит часы, «Выходной» закрывает день. Свободные окошки и онлайн-запись учитывают этот график.</p>
+        </details>
+        <details class="qa">
+          <summary>Почему в онлайн-записи нет свободного времени?</summary>
+          <p>Время занято записью, попадает в выходной или услуга не помещается до конца рабочего дня. Проверьте график и уже созданные записи. При выборе длительности показывается только время, которое помещается до следующего сеанса.</p>
+        </details>
+        <details class="qa">
+          <summary>Как изменить или удалить запись?</summary>
+          <p>Откройте «График», нажмите на запись и выберите изменение или удаление. Заявки из онлайн-записи приходят в график и в «Заявки на запись»: там их можно подтвердить или отклонить.</p>
+        </details>
+        <details class="qa">
+          <summary>Как установить приложение на телефон?</summary>
+          <p>Откройте сайт в браузере и выберите «Установить приложение» в меню браузера. На iPhone откройте сайт в Safari, нажмите «Поделиться» и выберите «На экран „Домой“». Приложение откроется с иконки как обычное.</p>
+        </details>
+        <details class="qa">
+          <summary>Не приходит код в Telegram</summary>
+          <p>Откройте ссылку на Telegram-бота, которая появляется при входе, и отправьте ему свой контакт. Код действует 10 минут. Если код не пришёл, запросите новый и проверьте, что номер совпадает с номером в аккаунте.</p>
+        </details>
+        <details class="qa">
+          <summary>Что с персональными данными?</summary>
+          <p>Данные используются для работы сервиса и ответа на обращения. Согласие запрашивается при регистрации, онлайн-записи и отправке этой формы. Чтобы удалить данные или задать вопрос, напишите в поддержку с темой «Вопрос».</p>
+        </details>
+      </div>
+    </section>
+
+    <aside class="help-side">
+      <form class="form-card" id="supportForm" novalidate>
+        <h2>Написать в поддержку</h2>
+        <p class="hint">Опишите, что произошло и на какой странице. Чем точнее детали, тем быстрее разберёмся.</p>
+        <div class="field">
+          <label for="sTopic">Тема</label>
+          <select id="sTopic">
+            <option value="problem">Проблема</option>
+            <option value="question">Вопрос</option>
+            <option value="idea">Предложение</option>
+            <option value="other">Другое</option>
+          </select>
+        </div>
+        <div class="row">
+          <div class="field"><label for="sName">Имя</label><input id="sName" type="text" maxlength="60" autocomplete="name" placeholder="Как к вам обращаться"></div>
+          <div class="field"><label for="sContact" id="contactLabel" class="req">Контакт для ответа</label><input id="sContact" type="text" maxlength="120" autocomplete="email" placeholder="Почта или телефон"></div>
+        </div>
+        <div class="field">
+          <label for="sMessage" class="req">Сообщение</label>
+          <textarea id="sMessage" maxlength="2000" rows="7" placeholder="Что случилось и на какой странице"></textarea>
+          <span class="hint counter" id="counter">0 / 2000</span>
+        </div>
+        <label class="check"><input type="checkbox" id="sConsent"> Согласен(на) на обработку персональных данных для ответа на обращение</label>
+        <button class="btn" type="submit" id="sendSupport">Отправить</button>
+        <div class="status" id="supportStatus" role="status"></div>
+      </form>
+      <div class="form-card help-done" id="supportDone" hidden>
+        <h2>Обращение отправлено</h2>
+        <p>Спасибо. Администратор получит сообщение и ответит на указанный контакт.</p>
+        <button class="btn ghost" type="button" id="sendAnother">Написать ещё</button>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<script src="../kit/backgrounds.js?v=202611281200"></script>
+<script src="../kit/trends.js?v=202611281200"></script>
+<script src="../kit/kit.js?v=202611281200"></script>
+<script>
+const API_URL = "https://api.masterfolio.ru";
+const $ = id => document.getElementById(id);
+const form = $("supportForm");
+let signedIn = false;
+function setStatus(text, kind) {
+  const el = $("supportStatus");
+  el.className = "status" + (kind ? " " + kind : "");
+  el.textContent = text;
+}
+$("sMessage").addEventListener("input", () => { $("counter").textContent = $("sMessage").value.length + " / 2000"; });
+async function prefill() {
+  try {
+    const response = await fetch(API_URL + "/api/auth/me", { credentials: "include" });
+    if (!response.ok) return;
+    const data = await response.json();
+    const master = data && data.master;
+    if (!master) return;
+    signedIn = true;
+    if (!$("sName").value) $("sName").value = master.name || "";
+    if (!$("sContact").value) $("sContact").value = master.email || master.phone || "";
+    $("contactLabel").classList.remove("req");
+    $("sContact").placeholder = "Можно не заполнять";
+  } catch (error) {}
+}
+form.addEventListener("submit", async event => {
+  event.preventDefault();
+  const message = $("sMessage").value.trim();
+  const contact = $("sContact").value.trim();
+  if (message.length < 10) { setStatus("Опишите ситуацию подробнее — не менее 10 символов.", "err"); $("sMessage").focus(); return; }
+  if (!$("sConsent").checked) { setStatus("Нужно согласие на обработку персональных данных.", "err"); return; }
+  if (!contact && !signedIn) { setStatus("Укажите почту или телефон для ответа.", "err"); $("sContact").focus(); return; }
+  const button = $("sendSupport");
+  button.disabled = true;
+  button.textContent = "Отправляю…";
+  setStatus("");
+  try {
+    const response = await fetch(API_URL + "/api/support", {
+      method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        topic: $("sTopic").value,
+        name: $("sName").value.trim(),
+        contact,
+        message,
+        consent: true,
+        page: document.referrer || ""
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Не удалось отправить обращение.");
+    form.hidden = true;
+    $("supportDone").hidden = false;
+    $("supportDone").scrollIntoView({ block: "nearest", behavior: "smooth" });
+  } catch (error) {
+    setStatus(error.message || "Не удалось отправить. Попробуйте ещё раз.", "err");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Отправить";
+  }
+});
+$("sendAnother").addEventListener("click", async () => {
+  form.reset();
+  $("counter").textContent = "0 / 2000";
+  setStatus("");
+  $("supportDone").hidden = true;
+  form.hidden = false;
+  $("sTopic").value = "problem";
+  await prefill();
+  $("sMessage").focus();
+});
+prefill();
+</script>
+<script src="../kit/pwa.js?v=202611281200"></script>
+</body>
+</html>
